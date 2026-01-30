@@ -1,0 +1,9 @@
+{
+  "name": "كافي برو - Enterprise Cloud",
+  "description": "نظام إدارة عمليات المقاهي المتكامل مع مزامنة سحابية ورقابة جغرافية.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone",
+    "geolocation"
+  ]
+}
