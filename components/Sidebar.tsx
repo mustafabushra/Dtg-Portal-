@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { 
-  LayoutDashboard, Warehouse, Users, FileText, CreditCard, BrainCircuit, BarChart3, Settings as SettingsIcon, Globe, Banknote, Home, UserCircle, LogOut, ClipboardList, X
+  LayoutDashboard, Warehouse, Users, FileText, BrainCircuit, BarChart3, Settings as SettingsIcon, Globe, Banknote, Home, UserCircle, LogOut, ClipboardList, X
 } from 'lucide-react';
 import { View, UserType } from '../types';
 
@@ -12,9 +12,11 @@ interface SidebarProps {
   onLogout: () => void;
   isOpen: boolean;
   setIsOpen: (isOpen: boolean) => void;
+  logoUrl: string;
+  systemName: string;
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ currentView, setCurrentView, userType, onLogout, isOpen, setIsOpen }) => {
+const Sidebar: React.FC<SidebarProps> = ({ currentView, setCurrentView, userType, onLogout, isOpen, setIsOpen, logoUrl, systemName }) => {
   const adminItems = [
     { id: 'DASHBOARD' as View, label: 'لوحة التحكم', icon: LayoutDashboard },
     { id: 'TASK_MANAGER' as View, label: 'إدارة المهام', icon: ClipboardList },
@@ -23,7 +25,6 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setCurrentView, userType
     { id: 'RENTALS' as View, label: 'إدارة الإيجارات', icon: Home },
     { id: 'STAFF' as View, label: 'الموظفين والورديات', icon: Users },
     { id: 'DOCUMENTS' as View, label: 'الوثائق والتراخيص', icon: FileText },
-    { id: 'SUBSCRIPTIONS' as View, label: 'اشتراكات العملاء', icon: CreditCard },
     { id: 'SERVICE_SUBSCRIPTIONS' as View, label: 'اشتراكات الخدمات', icon: Globe },
     { id: 'REPORTS' as View, label: 'التقارير والإحصائيات', icon: BarChart3 },
     { id: 'AI_ASSISTANT' as View, label: 'المساعد الذكي', icon: BrainCircuit },
@@ -41,18 +42,15 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setCurrentView, userType
     <div className={`h-screen w-64 bg-slate-900 text-white fixed right-0 top-0 flex flex-col border-l border-slate-800 z-[60] shadow-2xl transition-transform duration-300 transform ${isOpen ? 'translate-x-0' : 'translate-x-full lg:translate-x-0'}`}>
       <div className="p-6 flex items-center justify-between border-b border-slate-800">
         <div className="flex items-center gap-3">
-          <div className="bg-white p-1 rounded-xl shadow-lg shadow-amber-500/10 flex items-center justify-center overflow-hidden w-10 h-10">
-            <img src="logo.png" alt="Dahran Logo" className="w-full h-full object-contain" onError={(e) => (e.currentTarget.src = 'https://placehold.co/100x100?text=DTG')} />
+          <div className="bg-white p-1 rounded-xl shadow-lg flex items-center justify-center overflow-hidden w-10 h-10">
+            <img src={logoUrl} alt="Logo" className="w-full h-full object-contain" onError={(e) => (e.currentTarget.src = 'https://placehold.co/100x100?text=Logo')} />
           </div>
-          <div>
-            <h1 className="text-xl font-black tracking-tight text-white leading-none">كافي برو</h1>
-            <p className="text-[10px] text-amber-500 font-bold mt-1 uppercase tracking-widest">Enterprise Edition</p>
+          <div className="min-w-0">
+            <h1 className="text-lg font-black tracking-tight text-white leading-none truncate">{systemName}</h1>
+            <p className="text-[10px] text-custom-primary font-bold mt-1 uppercase tracking-widest">Cloud System</p>
           </div>
         </div>
-        <button 
-          onClick={() => setIsOpen(false)}
-          className="lg:hidden p-2 hover:bg-slate-800 rounded-lg"
-        >
+        <button onClick={() => setIsOpen(false)} className="lg:hidden p-2 hover:bg-slate-800 rounded-lg">
           <X className="w-5 h-5 text-slate-400" />
         </button>
       </div>
@@ -68,7 +66,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setCurrentView, userType
               onClick={() => setCurrentView(item.id)}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
                 isActive 
-                  ? 'bg-gradient-to-l from-amber-500 to-amber-600 text-slate-900 font-bold shadow-lg shadow-amber-500/20 translate-x-1' 
+                  ? 'bg-custom-primary text-slate-900 font-bold shadow-lg shadow-custom translate-x-1' 
                   : 'text-slate-400 hover:bg-slate-800/50 hover:text-white'
               }`}
             >
@@ -91,10 +89,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setCurrentView, userType
             <span className="text-sm">إعدادات النظام</span>
           </button>
         )}
-        <button 
-          onClick={onLogout}
-          className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-rose-400 hover:bg-rose-500/10 transition-all"
-        >
+        <button onClick={onLogout} className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-rose-400 hover:bg-rose-500/10 transition-all">
           <LogOut className="w-5 h-5" />
           <span className="text-sm">تسجيل الخروج</span>
         </button>

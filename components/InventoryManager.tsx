@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { Plus, Search, Trash2, Edit, X, Warehouse, Package, Gauge, Wrench, Image as ImageIcon, AlertCircle, History, DollarSign, Calendar, FileText } from 'lucide-react';
+import { Plus, Search, Trash2, Edit, X, Warehouse, Package, Gauge, Wrench, Image as ImageIcon, AlertCircle, History, DollarSign, Calendar, FileText, Clock } from 'lucide-react';
 import { InventoryItem, Asset, Category, MaintenanceRecord } from '../types';
 
 interface InventoryManagerProps {
@@ -52,6 +52,16 @@ const InventoryManager: React.FC<InventoryManagerProps> = ({
     return diffDays <= 3 && diffDays >= 0;
   };
 
+  const isExpiryUrgent = (dateStr?: string) => {
+    if (!dateStr) return false;
+    const expiryDate = new Date(dateStr);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const diffTime = expiryDate.getTime() - today.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return diffDays <= 7; // Alert if within 7 days or already expired
+  };
+
   const handleAddSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
@@ -67,6 +77,7 @@ const InventoryManager: React.FC<InventoryManagerProps> = ({
         minLimit: Number(formData.get('minLimit')),
         lastUpdated: new Date().toISOString().split('T')[0],
         imageUrl: formData.get('imageUrl') as string || undefined,
+        expiryDate: formData.get('expiryDate') as string || undefined,
       };
       editItem ? onUpdateItem(newItem) : onAddItem(newItem);
     } else {
@@ -140,7 +151,7 @@ const InventoryManager: React.FC<InventoryManagerProps> = ({
         <div className="p-6 border-b border-slate-100 flex items-center gap-4 bg-slate-50/50">
            <div className="flex-1 relative">
              <Search className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-             <input value={search} onChange={(e) => setSearch(e.target.value)} type="text" placeholder="ابحث في السجلات..." className="w-full pr-12 pl-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-4 focus:ring-amber-500/10 text-sm font-bold" />
+             <input value={search} onChange={(e) => setSearch(e.target.value)} type="text" placeholder="ابحث في السجلات..." className="w-full pr-12 pl-4 py-3.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-4 focus:ring-amber-500/10 text-sm font-bold" />
            </div>
         </div>
 
@@ -153,6 +164,7 @@ const InventoryManager: React.FC<InventoryManagerProps> = ({
                   <th className="px-8 py-4">اسم المادة</th>
                   <th className="px-8 py-4">القسم</th>
                   <th className="px-8 py-4">الكمية الحالية</th>
+                  <th className="px-8 py-4">تاريخ الانتهاء</th>
                   <th className="px-8 py-4 text-left">الإجراءات</th>
                 </tr>
               ) : (
@@ -166,33 +178,51 @@ const InventoryManager: React.FC<InventoryManagerProps> = ({
               )}
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {tab === 'STOCK' ? filteredStock.map(item => (
-                <tr key={item.id} className="hover:bg-slate-50 transition-colors group">
-                  <td className="px-8 py-5">
-                    <div className="w-12 h-12 rounded-xl bg-slate-100 overflow-hidden border border-slate-200 shadow-sm">
-                      {item.imageUrl ? (
-                        <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover" />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center text-slate-300">
-                          <ImageIcon className="w-5 h-5" />
-                        </div>
-                      )}
-                    </div>
-                  </td>
-                  <td className="px-8 py-5 text-sm font-black text-slate-900">{item.name}</td>
-                  <td className="px-8 py-5"><span className={`px-3 py-1 rounded-lg text-[10px] font-black ${item.category === Category.KITCHEN ? 'bg-orange-100 text-orange-700' : 'bg-blue-100 text-blue-700'}`}>{item.category}</span></td>
-                  <td className="px-8 py-5 text-sm font-bold text-slate-700">{item.quantity} {item.unit}</td>
-                  <td className="px-8 py-5 flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button onClick={() => handleOpenEdit(item)} className="p-2 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-all"><Edit className="w-4 h-4" /></button>
-                    <button 
-                      onClick={() => handleDelete(item.id, item.name)} 
-                      className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </td>
-                </tr>
-              )) : filteredAssets.map(asset => {
+              {tab === 'STOCK' ? filteredStock.map(item => {
+                const urgentExpiry = isExpiryUrgent(item.expiryDate);
+                const isExpired = item.expiryDate && new Date(item.expiryDate) < new Date();
+                return (
+                  <tr key={item.id} className="hover:bg-slate-50 transition-colors group">
+                    <td className="px-8 py-5">
+                      <div className="w-12 h-12 rounded-xl bg-slate-100 overflow-hidden border border-slate-200 shadow-sm">
+                        {item.imageUrl ? (
+                          <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover" />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-slate-300">
+                            <ImageIcon className="w-5 h-5" />
+                          </div>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-8 py-5 text-sm font-black text-slate-900">{item.name}</td>
+                    <td className="px-8 py-5"><span className={`px-3 py-1 rounded-lg text-[10px] font-black ${item.category === Category.KITCHEN ? 'bg-orange-100 text-orange-700' : 'bg-blue-100 text-blue-700'}`}>{item.category}</span></td>
+                    <td className="px-8 py-5 text-sm font-bold text-slate-700">{item.quantity} {item.unit}</td>
+                    <td className={`px-8 py-5 text-xs font-bold ${urgentExpiry ? 'text-rose-600' : 'text-slate-500'}`}>
+                      <div className="flex items-center gap-2">
+                        {item.expiryDate || 'غير محدد'}
+                        {urgentExpiry && (
+                          /* FIX: Move title to wrapping div as Lucide icons don't support title prop natively in some type versions */
+                          <div 
+                            className={`p-1 rounded-md ${isExpired ? 'bg-rose-500 text-white' : 'bg-rose-100 text-rose-600'}`}
+                            title={isExpired ? "منتهي الصلاحية" : "تنتهي الصلاحية قريباً"}
+                          >
+                            <AlertCircle className="w-3 h-3" />
+                          </div>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-8 py-5 flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button onClick={() => handleOpenEdit(item)} className="p-2 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-all"><Edit className="w-4 h-4" /></button>
+                      <button 
+                        onClick={() => handleDelete(item.id, item.name)} 
+                        className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </td>
+                  </tr>
+                );
+              }) : filteredAssets.map(asset => {
                 const urgent = isMaintenanceUrgent(asset.maintenanceDate);
                 return (
                   <tr key={asset.id} className="hover:bg-slate-50 transition-colors group">
@@ -207,7 +237,12 @@ const InventoryManager: React.FC<InventoryManagerProps> = ({
                     <td className="px-8 py-5 text-xs text-slate-500 font-bold">{asset.purchaseDate}</td>
                     <td className={`px-8 py-5 text-xs font-bold flex items-center gap-2 ${urgent ? 'text-red-600 animate-pulse' : 'text-amber-600'}`}>
                       {asset.maintenanceDate}
-                      {urgent && <AlertCircle className="w-3.5 h-3.5" title="موعد صيانة قريب (خلال 3 أيام)" />}
+                      {/* FIX: Move title to wrapping span as Lucide icons don't support title prop natively in some type versions */}
+                      {urgent && (
+                        <span title="موعد صيانة قريب (خلال 3 أيام)">
+                          <AlertCircle className="w-3.5 h-3.5" />
+                        </span>
+                      )}
                     </td>
                     <td className="px-8 py-5 text-sm font-black text-slate-900">{asset.cost.toLocaleString()} ر.س</td>
                     <td className="px-8 py-5 flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -241,29 +276,35 @@ const InventoryManager: React.FC<InventoryManagerProps> = ({
               {tab === 'STOCK' ? (
                 <>
                   <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2"><label className="text-xs font-black text-slate-500">اسم المادة</label><input name="name" defaultValue={editItem?.name} required className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-4 ring-amber-500/10 outline-none font-bold" /></div>
-                    <div className="space-y-2"><label className="text-xs font-black text-slate-500">القسم</label><select name="category" defaultValue={(editItem as any)?.category} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold"><option value={Category.KITCHEN}>مطبخ</option><option value={Category.BAR}>بار</option></select></div>
+                    <div className="space-y-2"><label className="text-xs font-black text-slate-500">اسم المادة</label><input name="name" defaultValue={editItem?.name} required className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl focus:ring-4 ring-amber-500/10 outline-none font-bold" /></div>
+                    <div className="space-y-2"><label className="text-xs font-black text-slate-500">القسم</label><select name="category" defaultValue={(editItem as any)?.category} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold"><option value={Category.KITCHEN}>مطبخ</option><option value={Category.BAR}>بار</option></select></div>
                   </div>
                   <div className="grid grid-cols-3 gap-4">
-                    <div className="space-y-2"><label className="text-xs font-black text-slate-500">الكمية</label><input name="quantity" defaultValue={(editItem as any)?.quantity} type="number" required className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold" /></div>
-                    <div className="space-y-2"><label className="text-xs font-black text-slate-500">الوحدة</label><input name="unit" defaultValue={(editItem as any)?.unit} placeholder="كجم/لتر" className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold" /></div>
-                    <div className="space-y-2"><label className="text-xs font-black text-slate-500">الحد الأدنى</label><input name="minLimit" defaultValue={(editItem as any)?.minLimit} type="number" className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold" /></div>
+                    <div className="space-y-2"><label className="text-xs font-black text-slate-500">الكمية</label><input name="quantity" defaultValue={(editItem as any)?.quantity} type="number" required className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold" /></div>
+                    <div className="space-y-2"><label className="text-xs font-black text-slate-500">الوحدة</label><input name="unit" defaultValue={(editItem as any)?.unit} placeholder="كجم/لتر" className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold" /></div>
+                    <div className="space-y-2"><label className="text-xs font-black text-slate-500">الحد الأدنى</label><input name="minLimit" defaultValue={(editItem as any)?.minLimit} type="number" className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold" /></div>
                   </div>
-                  <div className="space-y-2">
-                    <label className="text-xs font-black text-slate-500">رابط صورة المادة (للمساعدة في الفرز)</label>
-                    <input name="imageUrl" defaultValue={(editItem as any)?.imageUrl} placeholder="https://..." className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold text-xs" />
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <label className="text-xs font-black text-slate-500 flex items-center gap-1"><Clock className="w-3 h-3 text-rose-500" /> تاريخ الانتهاء</label>
+                      <input name="expiryDate" type="date" defaultValue={(editItem as any)?.expiryDate} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold" />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-xs font-black text-slate-500">رابط صورة المادة</label>
+                      <input name="imageUrl" defaultValue={(editItem as any)?.imageUrl} placeholder="https://..." className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold text-xs" />
+                    </div>
                   </div>
                 </>
               ) : (
                 <>
-                  <div className="space-y-2"><label className="text-xs font-black text-slate-500">اسم الأصل</label><input name="name" defaultValue={editItem?.name} required className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold" /></div>
+                  <div className="space-y-2"><label className="text-xs font-black text-slate-500">اسم الأصل</label><input name="name" defaultValue={editItem?.name} required className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold" /></div>
                   <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2"><label className="text-xs font-black text-slate-500">تاريخ الشراء</label><input name="purchaseDate" defaultValue={(editItem as any)?.purchaseDate} type="date" className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold" /></div>
-                    <div className="space-y-2"><label className="text-xs font-black text-slate-500">الصيانة القادمة</label><input name="maintenanceDate" defaultValue={(editItem as any)?.maintenanceDate} type="date" className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold" /></div>
+                    <div className="space-y-2"><label className="text-xs font-black text-slate-500">تاريخ الشراء</label><input name="purchaseDate" defaultValue={(editItem as any)?.purchaseDate} type="date" className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold" /></div>
+                    <div className="space-y-2"><label className="text-xs font-black text-slate-500">الصيانة القادمة</label><input name="maintenanceDate" defaultValue={(editItem as any)?.maintenanceDate} type="date" className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold" /></div>
                   </div>
                   <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2"><label className="text-xs font-black text-slate-500">التكلفة الإجمالية للأصل (ر.س)</label><input name="cost" defaultValue={(editItem as any)?.cost} type="number" required className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold" /></div>
-                    <div className="space-y-2"><label className="text-xs font-black text-slate-500">الحالة التشغيلية</label><select name="status" defaultValue={(editItem as any)?.status} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold"><option value="يعمل">يعمل</option><option value="تحت الصيانة">تحت الصيانة</option><option value="خارج الخدمة">خارج الخدمة</option></select></div>
+                    <div className="space-y-2"><label className="text-xs font-black text-slate-500">التكلفة الإجمالية للأصل (ر.س)</label><input name="cost" defaultValue={(editItem as any)?.cost} type="number" required className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold" /></div>
+                    <div className="space-y-2"><label className="text-xs font-black text-slate-500">الحالة التشغيلية</label><select name="status" defaultValue={(editItem as any)?.status} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold"><option value="يعمل">يعمل</option><option value="تحت الصيانة">تحت الصيانة</option><option value="خارج الخدمة">خارج الخدمة</option></select></div>
                   </div>
                 </>
               )}
@@ -302,16 +343,16 @@ const InventoryManager: React.FC<InventoryManagerProps> = ({
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1">
                     <label className="text-[10px] font-black text-slate-400 mr-2">تاريخ العملية</label>
-                    <input name="date" type="date" required defaultValue={new Date().toISOString().split('T')[0]} className="w-full p-3 border border-slate-200 rounded-xl outline-none font-bold bg-white" />
+                    <input name="date" type="date" required defaultValue={new Date().toISOString().split('T')[0]} className="w-full p-4 border border-slate-200 rounded-xl outline-none font-bold bg-white" />
                   </div>
                   <div className="space-y-1">
                     <label className="text-[10px] font-black text-slate-400 mr-2">تكلفة الصيانة (ر.س)</label>
-                    <input name="cost" type="number" required placeholder="0.00" className="w-full p-3 border border-slate-200 rounded-xl outline-none font-bold bg-white" />
+                    <input name="cost" type="number" required placeholder="0.00" className="w-full p-4 border border-slate-200 rounded-xl outline-none font-bold bg-white" />
                   </div>
                 </div>
                 <div className="space-y-1">
                   <label className="text-[10px] font-black text-slate-400 mr-2">القائم بالصيانة (اختياري)</label>
-                  <input name="performedBy" placeholder="اسم الفني أو الشركة..." className="w-full p-3 border border-slate-200 rounded-xl outline-none font-bold bg-white" />
+                  <input name="performedBy" placeholder="اسم الفني أو الشركة..." className="w-full p-4 border border-slate-200 rounded-xl outline-none font-bold bg-white" />
                 </div>
                 <div className="space-y-1">
                   <label className="text-[10px] font-black text-slate-400 mr-2">تفاصيل الصيانة</label>

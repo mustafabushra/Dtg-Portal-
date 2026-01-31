@@ -5,13 +5,41 @@ export enum Category {
   ASSET = 'أصول'
 }
 
+export type TaskType = 'operational' | 'monitoring' | 'urgent' | 'developmental';
+export type TaskPriority = 'low' | 'medium' | 'high' | 'critical';
+export type RecurrenceType = 'none' | 'daily' | 'weekly' | 'monthly';
+
+export interface ChecklistItem {
+  id: string;
+  text: string;
+  isCompleted: boolean;
+}
+
 export interface Task {
   id: string;
   title: string;
   description: string;
-  status: 'pending' | 'completed';
+  type: TaskType;
+  priority: TaskPriority;
+  status: 'pending' | 'completed' | 'overdue';
   assignedTo: string; // Staff ID
+  supervisorId?: string; // Staff ID (optional supervisor)
   createdAt: string;
+  deadline?: string;
+  
+  // التشغيل المتقدم
+  recurrence: RecurrenceType;
+  checklist: ChecklistItem[];
+  
+  // إثبات العمل (Proof of Work)
+  requiresPhoto: boolean;
+  requiresNote: boolean;
+  proofUrl?: string;
+  proofNote?: string;
+  
+  // السياق
+  contextId?: string; // ID of Event or Branch
+  locationRequired?: boolean; // GPS Check required at completion
 }
 
 export interface TreasuryTransaction {
@@ -95,13 +123,14 @@ export interface InventoryItem {
   lastUpdated: string;
   imageUrl?: string;
   consumptionRate?: number;
+  expiryDate?: string;
 }
 
 export interface Staff {
   id: string;
   name: string;
   role: string;
-  password?: string; // كلمة المرور للدخول
+  password?: string;
   shiftStart: string;
   shiftEnd: string;
   hourlyRate: number; 
@@ -113,7 +142,7 @@ export interface Staff {
   totalMonthlyEarnings?: number;
   attendanceHistory?: AttendanceLog[];
   externalAssignment?: ExternalAssignment;
-  permissions: string[]; // ['inventory.read', 'inventory.consume', 'attendance.mark']
+  permissions: string[];
 }
 
 export interface Document {
@@ -124,16 +153,6 @@ export interface Document {
   owner?: string;
   remindBeforeDays: number;
   fileUrl?: string;
-}
-
-export interface Subscription {
-  id: string;
-  customerName: string;
-  phone: string;
-  type: 'شهري' | 'سنوي' | 'ذهبي';
-  expiryDate: string;
-  status: 'نشط' | 'منتهي';
-  visitsCount: number; 
 }
 
 export interface ServiceSubscription {
@@ -147,6 +166,16 @@ export interface ServiceSubscription {
   status: 'نشط' | 'ملغي' | 'قيد التجديد';
 }
 
+export interface Subscription {
+  id: string;
+  customerName: string;
+  phone: string;
+  type: 'شهري' | 'سنوي' | 'ذهبي';
+  expiryDate: string;
+  status: 'نشط' | 'منتهي' | 'ملغي';
+  visitsCount: number;
+}
+
 export type UserType = 'ADMIN' | 'STAFF' | null;
 
-export type View = 'DASHBOARD' | 'INVENTORY_HUB' | 'STAFF' | 'DOCUMENTS' | 'SUBSCRIPTIONS' | 'SERVICE_SUBSCRIPTIONS' | 'AI_ASSISTANT' | 'REPORTS' | 'SETTINGS' | 'PAYROLL' | 'TREASURY' | 'RENTALS' | 'EMPLOYEE_PORTAL' | 'TASK_MANAGER';
+export type View = 'DASHBOARD' | 'INVENTORY_HUB' | 'STAFF' | 'DOCUMENTS' | 'SERVICE_SUBSCRIPTIONS' | 'AI_ASSISTANT' | 'REPORTS' | 'SETTINGS' | 'PAYROLL' | 'TREASURY' | 'RENTALS' | 'EMPLOYEE_PORTAL' | 'TASK_MANAGER';

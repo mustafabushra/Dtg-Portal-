@@ -11,11 +11,9 @@ interface ReportsProps {
 }
 
 const Reports: React.FC<ReportsProps> = ({ data }) => {
-  // حساب البيانات الحقيقية للرسوم البيانية
   const inventoryStats = [
     { name: 'المخزون', count: data.inventory.length },
     { name: 'الأصول', count: data.assets.length },
-    { name: 'المشتركين', count: data.subscriptions.length },
     { name: 'الموظفين', count: data.staff.length }
   ];
 

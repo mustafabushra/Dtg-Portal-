@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Users, Clock, Trash2, Edit, X, Plus, MapPin, 
-  LogIn, LogOut, Radio, Loader2, AlertCircle, ShieldCheck
+  LogIn, LogOut, Radio, Loader2, AlertCircle, ShieldCheck, Key, History, Calendar
 } from 'lucide-react';
 import { Staff, AttendanceLog } from '../types';
 
@@ -12,7 +12,6 @@ interface StaffManagerProps {
   onDelete: (id: string) => void;
   onUpdate: (member: Staff) => void;
   onAttendance: (staffId: string, type: 'IN' | 'OUT') => void;
-  // Fix: Added missing onSetAssignment property to satisfy App.tsx usage
   onSetAssignment: (id: string, assignment: any) => void;
   cafeLocation: { lat: number, lng: number };
 }
@@ -70,13 +69,13 @@ const StaffManager: React.FC<StaffManagerProps> = ({ staff, onAdd, onDelete, onU
   const handleAddSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
-    // Fix: Added missing 'permissions' and other mandatory fields to satisfy Staff interface requirements (line 73)
     const newStaff: Staff = {
       id: editMember ? editMember.id : Math.random().toString(36).substr(2, 9),
       name: formData.get('name') as string,
       role: formData.get('role') as string,
-      shiftStart: formData.get('shiftStart') as string || (editMember?.shiftStart || '09:00'),
-      shiftEnd: formData.get('shiftEnd') as string || (editMember?.shiftEnd || '17:00'),
+      password: formData.get('password') as string || (editMember?.password || '1234'),
+      shiftStart: formData.get('shiftStart') as string || '09:00',
+      shiftEnd: formData.get('shiftEnd') as string || '17:00',
       hourlyRate: Number(formData.get('hourlyRate')),
       documents: editMember ? editMember.documents : [],
       isClockedIn: editMember ? editMember.isClockedIn : false,
@@ -97,7 +96,7 @@ const StaffManager: React.FC<StaffManagerProps> = ({ staff, onAdd, onDelete, onU
           <Users className="w-6 h-6 text-amber-500" /> إدارة القوى العاملة
         </h2>
         <button onClick={() => { setEditMember(null); setShowModal(true); }} className="bg-slate-900 text-white px-6 py-3 rounded-2xl font-black hover:bg-amber-500 hover:text-slate-900 transition-all shadow-xl active:scale-95 flex items-center gap-2">
-          <Plus className="w-5 h-5" /> إضافة موظف
+          <Plus className="w-5 h-5" /> تسجيل موظف جديد
         </button>
       </div>
 
@@ -115,6 +114,7 @@ const StaffManager: React.FC<StaffManagerProps> = ({ staff, onAdd, onDelete, onU
               </div>
               <div className="flex flex-col gap-1">
                 <button onClick={() => { setEditMember(member); setShowModal(true); }} className="p-2 text-slate-300 hover:text-amber-500 transition-colors"><Edit className="w-4 h-4" /></button>
+                <button onClick={() => { setSelectedForDetail(member); setShowDetailModal('HISTORY'); }} className="p-2 text-slate-300 hover:text-blue-500 transition-colors"><History className="w-4 h-4" /></button>
                 <button onClick={() => onDelete(member.id)} className="p-2 text-slate-300 hover:text-red-500 transition-colors"><Trash2 className="w-4 h-4" /></button>
               </div>
             </div>
@@ -132,13 +132,70 @@ const StaffManager: React.FC<StaffManagerProps> = ({ staff, onAdd, onDelete, onU
 
             <button 
               onClick={() => { setSelectedForDetail(member); setShowDetailModal('ATTENDANCE'); }}
-              className="w-full py-3.5 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-amber-500 hover:text-slate-900 transition-all shadow-lg shadow-amber-500/20"
+              className="w-full py-3.5 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-amber-500 hover:text-slate-900 transition-all shadow-lg"
             >
               <MapPin className="w-4 h-4" /> بصمة الموقع (GPS)
             </button>
           </div>
         ))}
       </div>
+
+      {/* Attendance History Modal */}
+      {showDetailModal === 'HISTORY' && selectedForDetail && (
+        <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-md z-[100] flex items-center justify-center p-4">
+          <div className="bg-white rounded-[3rem] w-full max-w-2xl shadow-2xl animate-in zoom-in-95 duration-200 overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="p-8 bg-slate-900 text-white flex justify-between items-center shrink-0">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-xl bg-white/10 flex items-center justify-center border border-white/20">
+                  <History className="w-6 h-6 text-amber-500" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-black">سجل البصمات: {selectedForDetail.name}</h3>
+                  <p className="text-[10px] text-amber-400 font-bold uppercase tracking-widest">Attendance & Payroll Log</p>
+                </div>
+              </div>
+              <button onClick={() => setShowDetailModal(null)} className="p-3 hover:bg-slate-800 rounded-2xl transition-colors"><X className="w-6 h-6" /></button>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto p-8 space-y-4">
+              {selectedForDetail.attendanceHistory && selectedForDetail.attendanceHistory.length > 0 ? (
+                selectedForDetail.attendanceHistory.map((log) => {
+                  const dateObj = new Date(log.timestamp);
+                  return (
+                    <div key={log.id} className="p-5 bg-slate-50 border border-slate-100 rounded-2xl flex items-center justify-between group hover:border-amber-200 transition-all">
+                      <div className="flex items-center gap-4">
+                        <div className={`p-3 rounded-xl ${log.type === 'IN' ? 'bg-emerald-100 text-emerald-600' : 'bg-rose-100 text-rose-600'}`}>
+                          {log.type === 'IN' ? <LogIn className="w-5 h-5" /> : <LogOut className="w-5 h-5" />}
+                        </div>
+                        <div>
+                          <p className="text-sm font-black text-slate-900">
+                            {log.type === 'IN' ? 'تسجيل دخول' : 'تسجيل انصراف'}
+                          </p>
+                          <div className="flex items-center gap-3 mt-1 text-[10px] text-slate-400 font-bold">
+                            <span className="flex items-center gap-1"><Calendar className="w-3 h-3" /> {dateObj.toLocaleDateString('ar-SA')}</span>
+                            <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {dateObj.toLocaleTimeString('ar-SA')}</span>
+                          </div>
+                        </div>
+                      </div>
+                      {log.earnedAmount !== undefined && log.earnedAmount > 0 && (
+                        <div className="px-4 py-2 bg-white border border-slate-200 rounded-xl shadow-sm text-center">
+                          <p className="text-[9px] font-black text-slate-400 uppercase">المكسب</p>
+                          <p className="text-xs font-black text-emerald-600">+{log.earnedAmount} ر.س</p>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
+              ) : (
+                <div className="text-center py-20 bg-slate-50 rounded-[2rem] border-2 border-dashed border-slate-100">
+                  <Clock className="w-12 h-12 text-slate-200 mx-auto mb-3" />
+                  <p className="text-slate-400 font-bold italic">لا توجد سجلات حضور مسجلة لهذا الموظف.</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* GPS Clocking Modal */}
       {showDetailModal === 'ATTENDANCE' && selectedForDetail && (
@@ -226,7 +283,14 @@ const StaffManager: React.FC<StaffManagerProps> = ({ staff, onAdd, onDelete, onU
                   <input name="hourlyRate" type="number" defaultValue={editMember?.hourlyRate} required className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold" />
                 </div>
               </div>
-              {/* Added shift time inputs to make the UI match the logic and Staff interface requirements */}
+              
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest mr-2 flex items-center gap-1">
+                  <Key className="w-3 h-3" /> رمز الدخول (PIN)
+                </label>
+                <input name="password" type="password" defaultValue={editMember?.password} required placeholder="1234" className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold tracking-widest" />
+              </div>
+
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest mr-2">بداية الوردية</label>

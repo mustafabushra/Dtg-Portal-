@@ -2,28 +2,44 @@
 import React from 'react';
 import { 
   TrendingUp, Sparkles, Warehouse, Users, DollarSign, RefreshCw, 
-  ArrowUpRight, ArrowDownRight, Coffee, ShieldAlert, Globe
+  ArrowUpRight, ArrowDownRight, Coffee, ShieldAlert, Globe, Clock,
+  UserPlus, Plus, ReceiptText, LayoutGrid
 } from 'lucide-react';
 import { ResponsiveContainer, AreaChart, Area, CartesianGrid, XAxis, YAxis, Tooltip } from 'recharts';
+import { View } from '../types';
 
 interface DashboardProps {
   data: any;
   insight: string;
   onRefreshInsights: () => void;
   isRefreshing: boolean;
-  onQuickOrder?: (id: string) => void;
+  setCurrentView: (view: View) => void;
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ data, insight, onRefreshInsights, isRefreshing }) => {
+const Dashboard: React.FC<DashboardProps> = ({ data, insight, onRefreshInsights, isRefreshing, setCurrentView }) => {
   const totalIn = data.treasuryTransactions.filter((t: any) => t.type === 'IN').reduce((a: number, b: any) => a + b.amount, 0);
   const totalOut = data.treasuryTransactions.filter((t: any) => t.type === 'OUT').reduce((a: number, b: any) => a + b.amount, 0);
   const balance = totalIn - totalOut;
 
   const lowStock = data.inventory.filter((i: any) => i.quantity <= i.minLimit);
+  
+  const expiringInventory = data.inventory.filter((i: any) => {
+    if (!i.expiryDate) return false;
+    const diff = new Date(i.expiryDate).getTime() - new Date().getTime();
+    return diff < (7 * 24 * 3600 * 1000); // Alert within 7 days
+  });
+
   const expiringDocs = data.documents.filter((d: any) => {
     const diff = new Date(d.expiryDate).getTime() - new Date().getTime();
     return diff < (30 * 24 * 3600 * 1000);
   });
+
+  const quickActions = [
+    { id: 'STAFF', label: 'تسجيل موظف', icon: UserPlus, color: 'bg-blue-500' },
+    { id: 'INVENTORY_HUB', label: 'إضافة مخزون', icon: Plus, color: 'bg-amber-500' },
+    { id: 'TREASURY', label: 'سند مالي', icon: ReceiptText, color: 'bg-emerald-500' },
+    { id: 'TASK_MANAGER', label: 'تعيين مهمة', icon: LayoutGrid, color: 'bg-indigo-500' },
+  ];
 
   return (
     <div className="space-y-4 md:space-y-6 animate-in fade-in duration-700">
@@ -38,6 +54,11 @@ const Dashboard: React.FC<DashboardProps> = ({ data, insight, onRefreshInsights,
             <Warehouse className="w-3 h-3" /> {lowStock.length} نواقص
           </div>
         )}
+        {expiringInventory.length > 0 && (
+          <div className="flex-none bg-rose-100 text-rose-700 px-3 md:px-4 py-1.5 md:py-2 rounded-full text-[9px] md:text-[10px] font-black flex items-center gap-2 border border-rose-200 whitespace-nowrap">
+            <Clock className="w-3 h-3" /> {expiringInventory.length} صلاحيات منتهية قريباً
+          </div>
+        )}
         {expiringDocs.length > 0 && (
           <div className="flex-none bg-red-100 text-red-700 px-3 md:px-4 py-1.5 md:py-2 rounded-full text-[9px] md:text-[10px] font-black flex items-center gap-2 border border-red-200 whitespace-nowrap">
             <ShieldAlert className="w-3 h-3" /> {expiringDocs.length} وثائق
@@ -50,6 +71,25 @@ const Dashboard: React.FC<DashboardProps> = ({ data, insight, onRefreshInsights,
         <StatCard title="الموظفين" value={data.staff.filter((s:any)=>s.isClockedIn).length} unit="نشط" icon={Users} color="blue" up={null} />
         <StatCard title="المخزون" value={data.inventory.length} unit="صنف" icon={Warehouse} color="emerald" up={false} />
         <StatCard title="الإيجارات" value={data.rentals.length} unit="وحدة" icon={Coffee} color="indigo" up={true} />
+      </div>
+
+      {/* Quick Actions Section */}
+      <div className="bg-white p-6 md:p-8 rounded-[2.5rem] shadow-sm border border-slate-200">
+        <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest mb-6">إجراءات سريعة</h3>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {quickActions.map(action => (
+            <button 
+              key={action.id}
+              onClick={() => setCurrentView(action.id as View)}
+              className="flex flex-col items-center justify-center p-6 bg-slate-50 rounded-3xl border border-slate-100 hover:border-amber-500 hover:bg-white hover:shadow-xl transition-all group"
+            >
+              <div className={`p-3 rounded-2xl ${action.color} text-white shadow-lg mb-3 group-hover:scale-110 transition-transform`}>
+                <action.icon className="w-6 h-6" />
+              </div>
+              <span className="text-xs font-black text-slate-900">{action.label}</span>
+            </button>
+          ))}
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">

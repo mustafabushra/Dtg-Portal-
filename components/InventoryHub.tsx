@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { 
-  MinusCircle, Scale, LayoutGrid, AlertCircle, ShoppingCart, Coffee, PackageCheck
+  MinusCircle, Scale, LayoutGrid, AlertCircle, ShoppingCart, Coffee, PackageCheck, Clock
 } from 'lucide-react';
 import InventoryManager from './InventoryManager';
 import StockAdjustment from './StockAdjustment';
@@ -26,6 +26,11 @@ const InventoryHub: React.FC<InventoryHubProps> = ({
   const [activeTab, setActiveTab] = useState<'MANAGEMENT' | 'BARISTA_VIEW' | 'ADJUST'>('BARISTA_VIEW');
 
   const lowStock = inventory.filter(i => i.quantity <= i.minLimit);
+  const expiringStock = inventory.filter(i => {
+    if (!i.expiryDate) return false;
+    const diff = new Date(i.expiryDate).getTime() - new Date().getTime();
+    return diff < (7 * 24 * 3600 * 1000);
+  });
 
   return (
     <div className="space-y-6 md:space-y-8 animate-in fade-in duration-500">
@@ -78,23 +83,35 @@ const InventoryHub: React.FC<InventoryHubProps> = ({
            <div className="space-y-6">
               <div className="bg-slate-900 text-white p-6 md:p-8 rounded-2xl md:rounded-[2.5rem] shadow-2xl relative overflow-hidden border-b-4 md:border-b-8 border-rose-500">
                  <div className="absolute top-0 right-0 w-32 h-32 bg-rose-500/10 rounded-full blur-3xl"></div>
-                 <h3 className="text-xs md:text-sm font-black text-rose-400 mb-4 md:mb-6 flex items-center gap-2 tracking-widest"><AlertCircle className="w-4 h-4 md:w-5 md:h-5" /> نواقص حرجة</h3>
-                 <div className="space-y-3 relative z-10">
-                    {lowStock.map(item => (
-                      <div key={item.id} className="bg-white/5 p-3 md:p-4 rounded-xl md:rounded-2xl flex items-center justify-between border border-white/10 group">
-                         <div>
-                            <p className="text-[11px] md:text-xs font-black">{item.name}</p>
-                            <p className="text-[9px] md:text-[10px] text-rose-400 font-bold">بقي: {item.quantity}</p>
-                         </div>
-                         <button onClick={() => onAdjust(item.id, item.quantity + 20)} className="p-2 md:p-3 bg-rose-500 text-white rounded-lg md:rounded-xl shadow-lg hover:scale-110 transition-transform"><ShoppingCart className="w-3.5 h-3.5 md:w-4 md:h-4" /></button>
-                      </div>
-                    ))}
-                    {lowStock.length === 0 && (
-                      <div className="text-center py-6 md:py-10">
-                        <PackageCheck className="w-10 h-10 text-emerald-500/20 mx-auto mb-2" />
-                        <p className="text-[9px] md:text-[11px] text-slate-500 font-black uppercase tracking-widest">المستودع مكتمل</p>
-                      </div>
-                    )}
+                 <h3 className="text-xs md:text-sm font-black text-rose-400 mb-4 md:mb-6 flex items-center gap-2 tracking-widest uppercase"><AlertCircle className="w-4 h-4 md:w-5 md:h-5" /> تنبيهات هامة</h3>
+                 
+                 <div className="space-y-4 relative z-10">
+                    {/* Low Stock Alerts */}
+                    <div className="space-y-2">
+                      <p className="text-[9px] font-black text-slate-500 uppercase">نواقص الكميات</p>
+                      {lowStock.map(item => (
+                        <div key={item.id} className="bg-white/5 p-3 rounded-xl flex items-center justify-between border border-white/10">
+                           <p className="text-[11px] font-black">{item.name}</p>
+                           <p className="text-[9px] text-rose-400 font-bold">{item.quantity} متبقي</p>
+                        </div>
+                      ))}
+                      {lowStock.length === 0 && <p className="text-[9px] text-slate-500 italic">لا توجد نواقص</p>}
+                    </div>
+
+                    {/* Expiry Alerts */}
+                    <div className="space-y-2 pt-2 border-t border-white/5">
+                      <p className="text-[9px] font-black text-slate-500 uppercase">انتهاء الصلاحية</p>
+                      {expiringStock.map(item => (
+                        <div key={`exp-${item.id}`} className="bg-white/5 p-3 rounded-xl flex items-center justify-between border border-white/10">
+                           <div className="flex items-center gap-2">
+                             <Clock className="w-3 h-3 text-rose-500" />
+                             <p className="text-[11px] font-black">{item.name}</p>
+                           </div>
+                           <p className="text-[9px] text-rose-400 font-bold">{item.expiryDate}</p>
+                        </div>
+                      ))}
+                      {expiringStock.length === 0 && <p className="text-[9px] text-slate-500 italic">لا توجد أصناف منتهية قريباً</p>}
+                    </div>
                  </div>
               </div>
            </div>
