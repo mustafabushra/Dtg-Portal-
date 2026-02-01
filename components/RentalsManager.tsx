@@ -41,23 +41,64 @@ const RentalsManager: React.FC<RentalsManagerProps> = ({ rentals, onAdd, onUpdat
       .map(p => ({ ...p, unitNumber: r.unitNumber, tenantName: r.tenantName }))
   );
 
+  // دالة لتوليد جدول الدفعات تلقائياً
+  const generatePaymentSchedule = (start: string, end: string, cycle: string, amount: number): RentalPayment[] => {
+    const payments: RentalPayment[] = [];
+    let currentDate = new Date(start);
+    const endDate = new Date(end);
+    
+    // تحديد عدد الأشهر للإضافة بناءً على الدورة
+    let monthsToAdd = 1; // monthly
+    if (cycle === 'quarterly') monthsToAdd = 3;
+    if (cycle === 'triannual') monthsToAdd = 4;
+    if (cycle === 'biannual') monthsToAdd = 6;
+    if (cycle === 'yearly') monthsToAdd = 12;
+
+    while (currentDate <= endDate) {
+      payments.push({
+        id: Math.random().toString(36).substr(2, 9),
+        amount: amount,
+        dueDate: currentDate.toISOString().split('T')[0],
+        status: 'pending'
+      });
+      
+      // إضافة الأشهر للتاريخ الحالي
+      currentDate.setMonth(currentDate.getMonth() + monthsToAdd);
+    }
+    return payments;
+  };
+
   const handleAddSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
     const id = editUnit ? editUnit.id : Math.random().toString(36).substr(2, 9);
     
+    const rentAmount = Number(formData.get('rentAmount'));
+    const billingCycle = formData.get('billingCycle') as any;
+    const startDate = formData.get('startDate') as string;
+    const endDate = formData.get('endDate') as string;
+
+    // إذا كان عقد جديد، نقوم بتوليد الدفعات تلقائياً
+    // إذا كان تعديل، نحتفظ بالدفعات القديمة (لتجنب حذف السجلات المدفوعة)
+    let payments = editUnit ? editUnit.payments : [];
+    
+    // إذا كان جديداً تماماً، قم بتوليد الجدول
+    if (!editUnit) {
+       payments = generatePaymentSchedule(startDate, endDate, billingCycle, rentAmount);
+    }
+
     const newUnit: RentalUnit = {
       id,
       unitNumber: formData.get('unitNumber') as string,
       type: formData.get('type') as any,
       tenantName: formData.get('tenantName') as string,
       tenantPhone: formData.get('tenantPhone') as string,
-      rentAmount: Number(formData.get('rentAmount')),
-      billingCycle: formData.get('billingCycle') as any,
-      startDate: formData.get('startDate') as string,
-      endDate: formData.get('endDate') as string,
+      rentAmount,
+      billingCycle,
+      startDate,
+      endDate,
       status: 'occupied',
-      payments: editUnit ? editUnit.payments : [],
+      payments: payments,
     };
 
     editUnit ? onUpdate(newUnit) : onAdd(newUnit);
@@ -325,11 +366,13 @@ const RentalsManager: React.FC<RentalsManagerProps> = ({ rentals, onAdd, onUpdat
                 </div>
               </div>
               <div className="space-y-1">
-                <label className="text-xs font-black text-slate-500">دورة الفوترة</label>
+                <label className="text-xs font-black text-slate-500">دورة الفوترة (توليد تلقائي)</label>
                 <select name="billingCycle" defaultValue={editUnit?.billingCycle} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold">
-                  <option value="monthly">شهرياً</option>
-                  <option value="quarterly">كل 3 أشهر</option>
-                  <option value="yearly">سنوياً</option>
+                  <option value="monthly">شهرياً (كل شهر)</option>
+                  <option value="quarterly">ربع سنوي (كل 3 أشهر)</option>
+                  <option value="triannual">كل 4 أشهر</option>
+                  <option value="biannual">نصف سنوي (كل 6 أشهر)</option>
+                  <option value="yearly">سنوياً (كل سنة)</option>
                 </select>
               </div>
               <button type="submit" className="w-full py-4 bg-slate-900 text-white rounded-[1.5rem] font-black text-lg hover:bg-amber-500 hover:text-slate-900 transition-all active:scale-95 shadow-xl">

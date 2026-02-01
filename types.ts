@@ -62,7 +62,7 @@ export interface RentalUnit {
   tenantName: string;
   tenantPhone: string;
   rentAmount: number;
-  billingCycle: 'monthly' | 'quarterly' | 'yearly';
+  billingCycle: 'monthly' | 'quarterly' | 'triannual' | 'biannual' | 'yearly';
   startDate: string;
   endDate: string;
   status: 'occupied' | 'vacant' | 'maintenance';
