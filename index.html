@@ -11,6 +11,7 @@
       body {
         font-family: 'Cairo', sans-serif;
         background-color: #f8fafc;
+        color: #0f172a; /* لون نص داكن افتراضي */
         margin: 0;
         padding: 0;
         -webkit-tap-highlight-color: transparent;
@@ -23,6 +24,13 @@
         background: rgba(255, 255, 255, 0.8);
         backdrop-filter: blur(12px);
         border: 1px solid rgba(255, 255, 255, 0.3);
+      }
+      input, select, textarea {
+        color: #0f172a !important; /* ضمان ظهور نص الإدخال دائماً */
+      }
+      ::placeholder {
+        color: #94a3b8 !important;
+        opacity: 1;
       }
     </style>
     <script>

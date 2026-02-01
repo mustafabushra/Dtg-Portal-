@@ -22,24 +22,18 @@ export interface Task {
   type: TaskType;
   priority: TaskPriority;
   status: 'pending' | 'completed' | 'overdue';
-  assignedTo: string; // Staff ID
-  supervisorId?: string; // Staff ID (optional supervisor)
+  assignedTo: string;
+  supervisorId?: string;
   createdAt: string;
   deadline?: string;
-  
-  // التشغيل المتقدم
   recurrence: RecurrenceType;
   checklist: ChecklistItem[];
-  
-  // إثبات العمل (Proof of Work)
   requiresPhoto: boolean;
   requiresNote: boolean;
   proofUrl?: string;
   proofNote?: string;
-  
-  // السياق
-  contextId?: string; // ID of Event or Branch
-  locationRequired?: boolean; // GPS Check required at completion
+  contextId?: string;
+  locationRequired?: boolean;
 }
 
 export interface TreasuryTransaction {
@@ -129,6 +123,7 @@ export interface InventoryItem {
 export interface Staff {
   id: string;
   name: string;
+  username: string; // الحقل الجديد المضاف
   role: string;
   password?: string;
   shiftStart: string;
@@ -178,4 +173,4 @@ export interface Subscription {
 
 export type UserType = 'ADMIN' | 'STAFF' | null;
 
-export type View = 'DASHBOARD' | 'INVENTORY_HUB' | 'STAFF' | 'DOCUMENTS' | 'SERVICE_SUBSCRIPTIONS' | 'AI_ASSISTANT' | 'REPORTS' | 'SETTINGS' | 'PAYROLL' | 'TREASURY' | 'RENTALS' | 'EMPLOYEE_PORTAL' | 'TASK_MANAGER';
+export type View = 'DASHBOARD' | 'INVENTORY_HUB' | 'STAFF' | 'DOCUMENTS' | 'SERVICE_SUBSCRIPTIONS' | 'AI_ASSISTANT' | 'REPORTS' | 'SETTINGS' | 'PAYROLL' | 'TREASURY' | 'RENTALS' | 'EMPLOYEE_PORTAL' | 'TASK_MANAGER' | 'DEPLOYMENT_CENTER';
