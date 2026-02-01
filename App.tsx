@@ -16,54 +16,111 @@ import Login from './components/Login';
 import EmployeePortal from './components/EmployeePortal';
 import TaskManager from './components/TaskManager';
 import DeploymentCenter from './components/DeploymentCenter';
-import { View, Category, InventoryItem, Asset, Staff, Document, ServiceSubscription, AttendanceLog, TreasuryTransaction, RentalUnit, UserType, Task } from './types';
-import { Menu } from 'lucide-react';
+import { View, InventoryItem, Asset, Staff, Document, ServiceSubscription, AttendanceLog, TreasuryTransaction, RentalUnit, UserType, Task } from './types';
+import { Menu, WifiOff } from 'lucide-react';
 import { getCafeInsights } from './services/geminiService';
+import { db } from './services/firebase';
+import { collection, onSnapshot, doc, setDoc, deleteDoc, updateDoc } from 'firebase/firestore';
 
 const App: React.FC = () => {
   const [currentUserType, setCurrentUserType] = useState<UserType>(null);
   const [currentStaffUser, setCurrentStaffUser] = useState<Staff | null>(null);
   const [currentView, setCurrentView] = useState<View>('DASHBOARD');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  
-  const loadData = (key: string, defaultValue: any) => {
-    const saved = localStorage.getItem(key);
-    return saved ? JSON.parse(saved) : defaultValue;
-  };
+  const [dbStatus, setDbStatus] = useState<'connected' | 'offline'>('connected');
 
-  const [inventory, setInventory] = useState<InventoryItem[]>(() => loadData('cafe_inventory', []));
-  const [assets, setAssets] = useState<Asset[]>(() => loadData('cafe_assets', []));
-  const [staff, setStaff] = useState<Staff[]>(() => loadData('cafe_staff', []));
-  const [tasks, setTasks] = useState<Task[]>(() => loadData('cafe_tasks', []));
-  const [documents, setDocuments] = useState<Document[]>(() => loadData('cafe_documents', []));
-  const [serviceSubscriptions, setServiceSubscriptions] = useState<ServiceSubscription[]>(() => loadData('cafe_services', []));
-  const [treasuryTransactions, setTreasuryTransactions] = useState<TreasuryTransaction[]>(() => loadData('cafe_treasury', []));
-  const [rentals, setRentals] = useState<RentalUnit[]>(() => loadData('cafe_rentals', []));
-  const [cafeLocation, setCafeLocation] = useState(() => loadData('cafe_location', { lat: 21.54105, lng: 39.17171 }));
-  const [billingThreshold, setBillingThreshold] = useState<number>(() => loadData('billing_threshold', 7));
+  // --- تعريف الحالات (State) ---
+  const [inventory, setInventory] = useState<InventoryItem[]>([]);
+  const [assets, setAssets] = useState<Asset[]>([]);
+  const [staff, setStaff] = useState<Staff[]>([]);
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [documents, setDocuments] = useState<Document[]>([]);
+  const [serviceSubscriptions, setServiceSubscriptions] = useState<ServiceSubscription[]>([]);
+  const [treasuryTransactions, setTreasuryTransactions] = useState<TreasuryTransaction[]>([]);
+  const [rentals, setRentals] = useState<RentalUnit[]>([]);
   
-  const [themeSettings, setThemeSettings] = useState(() => loadData('cafe_theme', {
+  // الإعدادات العامة (يتم جلبها كوثائق منفصلة)
+  const [cafeLocation, setCafeLocation] = useState({ lat: 21.54105, lng: 39.17171 });
+  const [billingThreshold, setBillingThreshold] = useState<number>(7);
+  const [themeSettings, setThemeSettings] = useState({
     systemName: 'كافي برو',
     primaryColor: '#f59e0b',
     logoUrl: 'https://api.dicebear.com/7.x/initials/svg?seed=CAFE',
     cafeAccountId: '10101'
-  }));
+  });
 
   const [insight, setInsight] = useState<string>('جاري تحليل كفاءة التشغيل المباشرة...');
   const [isRefreshingInsight, setIsRefreshingInsight] = useState(false);
 
+  // --- المزامنة مع Firebase (Realtime Sync) ---
+  useEffect(() => {
+    // دالة مساعدة للاشتراك في المجموعات
+    const subscribe = (colName: string, setter: React.Dispatch<React.SetStateAction<any[]>>) => {
+      try {
+        return onSnapshot(collection(db, colName), (snapshot) => {
+          const data = snapshot.docs.map(doc => doc.data());
+          setter(data);
+          setDbStatus('connected');
+        }, (error) => {
+          console.error(`Error fetching ${colName}:`, error);
+          setDbStatus('offline');
+        });
+      } catch (e) {
+        console.error("Firebase init error", e);
+        return () => {};
+      }
+    };
+
+    // الاشتراك في جميع البيانات
+    const unsubs = [
+      subscribe('inventory', setInventory),
+      subscribe('assets', setAssets),
+      subscribe('staff', setStaff),
+      subscribe('tasks', setTasks),
+      subscribe('documents', setDocuments),
+      subscribe('services', setServiceSubscriptions),
+      subscribe('treasury', setTreasuryTransactions),
+      subscribe('rentals', setRentals),
+    ];
+
+    // الاشتراك في الإعدادات الفردية
+    const unsubSettings = onSnapshot(collection(db, 'settings'), (snapshot) => {
+       snapshot.docs.forEach(doc => {
+         if (doc.id === 'theme') setThemeSettings(doc.data() as any);
+         if (doc.id === 'location') setCafeLocation(doc.data() as any);
+         if (doc.id === 'config') setBillingThreshold(doc.data().billingThreshold);
+       });
+    });
+
+    return () => {
+      unsubs.forEach(unsub => unsub());
+      unsubSettings();
+    };
+  }, []);
+
+  // --- دوال التعامل مع قاعدة البيانات (CRUD Helpers) ---
+  const saveDoc = async (colName: string, data: any) => {
+    try {
+      await setDoc(doc(db, colName, data.id), data);
+    } catch (e) {
+      console.error("Error saving doc:", e);
+      alert("حدث خطأ في الحفظ، تأكد من إعدادات Firebase");
+    }
+  };
+
+  const removeDoc = async (colName: string, id: string) => {
+    try {
+      await deleteDoc(doc(db, colName, id));
+    } catch (e) {
+      console.error("Error deleting doc:", e);
+    }
+  };
+
+  // --- إعدادات الثيم ---
   useEffect(() => {
     document.title = `${themeSettings.systemName} - Cloud OS`;
     document.documentElement.style.setProperty('--primary-color', themeSettings.primaryColor);
-    localStorage.setItem('cafe_theme', JSON.stringify(themeSettings));
   }, [themeSettings]);
-
-  useEffect(() => { localStorage.setItem('cafe_inventory', JSON.stringify(inventory)); }, [inventory]);
-  useEffect(() => { localStorage.setItem('cafe_staff', JSON.stringify(staff)); }, [staff]);
-  useEffect(() => { localStorage.setItem('cafe_tasks', JSON.stringify(tasks)); }, [tasks]);
-  useEffect(() => { localStorage.setItem('cafe_documents', JSON.stringify(documents)); }, [documents]);
-  useEffect(() => { localStorage.setItem('cafe_treasury', JSON.stringify(treasuryTransactions)); }, [treasuryTransactions]);
-  useEffect(() => { localStorage.setItem('cafe_rentals', JSON.stringify(rentals)); }, [rentals]);
 
   const appData = useMemo(() => ({ inventory, assets, staff, documents, serviceSubscriptions, treasuryTransactions, rentals, cafeLocation, tasks, billingThreshold }), 
     [inventory, assets, staff, documents, serviceSubscriptions, treasuryTransactions, rentals, cafeLocation, tasks, billingThreshold]);
@@ -76,6 +133,8 @@ const App: React.FC = () => {
   };
 
   const handleLogin = (type: 'ADMIN' | 'STAFF', credentials: { cafeId: string, username: string, password?: string }) => {
+    // في الوضع الفعلي، يجب أن يتم التحقق من قاعدة البيانات أيضاً
+    // للتسهيل حالياً، سنعتمد على البيانات المحملة من Firebase
     if (credentials.cafeId !== themeSettings.cafeAccountId) {
       alert('رقم المؤسسة غير صحيح. يرجى مراجعة الإدارة.');
       return;
@@ -93,7 +152,6 @@ const App: React.FC = () => {
       if (user && user.password === credentials.password) {
         setCurrentStaffUser(user);
         setCurrentUserType('STAFF');
-        // التوجيه لأول صفحة مسموح بها، أو البوابة الشخصية كخيار أول
         if (user.permissions && user.permissions.length > 0) {
           setCurrentView(user.permissions[0] as View);
         } else {
@@ -105,21 +163,37 @@ const App: React.FC = () => {
     }
   };
 
-  const updateStaffAttendance = (staffId: string, type: 'IN' | 'OUT') => {
+  const updateStaffAttendance = async (staffId: string, type: 'IN' | 'OUT') => {
+    const targetStaff = staff.find(s => s.id === staffId);
+    if (!targetStaff) return;
+
     const now = new Date();
-    setStaff(prevStaff => prevStaff.map(s => {
-      if (s.id !== staffId) return s;
-      let earned = 0;
-      if (type === 'OUT' && s.lastClockIn) {
-        const diffMs = now.getTime() - new Date(s.lastClockIn).getTime();
-        const diffHours = diffMs / (1000 * 60 * 60);
-        earned = diffHours * s.hourlyRate;
-      }
-      const log: AttendanceLog = { id: Math.random().toString(36).substr(2, 9), type, timestamp: now.toISOString(), earnedAmount: Math.round(earned) };
-      const updatedUser = { ...s, isClockedIn: type === 'IN', lastClockIn: type === 'IN' ? now.toISOString() : s.lastClockIn, attendanceHistory: [log, ...(s.attendanceHistory || [])], totalMonthlyHours: (s.totalMonthlyHours || 0) + (type === 'OUT' ? (now.getTime() - new Date(s.lastClockIn!).getTime()) / 3600000 : 0), totalMonthlyEarnings: (s.totalMonthlyEarnings || 0) + earned };
-      if (currentStaffUser?.id === staffId) setCurrentStaffUser(updatedUser);
-      return updatedUser;
-    }));
+    let earned = 0;
+    
+    if (type === 'OUT' && targetStaff.lastClockIn) {
+      const diffMs = now.getTime() - new Date(targetStaff.lastClockIn).getTime();
+      const diffHours = diffMs / (1000 * 60 * 60);
+      earned = diffHours * targetStaff.hourlyRate;
+    }
+
+    const log: AttendanceLog = { 
+      id: Math.random().toString(36).substr(2, 9), 
+      type, 
+      timestamp: now.toISOString(), 
+      earnedAmount: Math.round(earned) 
+    };
+
+    const updatedUser: Staff = { 
+      ...targetStaff, 
+      isClockedIn: type === 'IN', 
+      lastClockIn: type === 'IN' ? now.toISOString() : targetStaff.lastClockIn, 
+      attendanceHistory: [log, ...(targetStaff.attendanceHistory || [])], 
+      totalMonthlyHours: (targetStaff.totalMonthlyHours || 0) + (type === 'OUT' ? (now.getTime() - new Date(targetStaff.lastClockIn!).getTime()) / 3600000 : 0), 
+      totalMonthlyEarnings: (targetStaff.totalMonthlyEarnings || 0) + earned 
+    };
+
+    await saveDoc('staff', updatedUser);
+    if (currentStaffUser?.id === staffId) setCurrentStaffUser(updatedUser);
   };
 
   if (!currentUserType) {
@@ -140,7 +214,7 @@ const App: React.FC = () => {
         currentView={currentView} 
         setCurrentView={(v) => { setCurrentView(v); setIsSidebarOpen(false); }} 
         userType={currentUserType} 
-        staffUser={currentStaffUser} // تمرير بيانات الموظف للجانبية
+        staffUser={currentStaffUser} 
         onLogout={() => { setCurrentUserType(null); setCurrentStaffUser(null); }}
         isOpen={isSidebarOpen}
         setIsOpen={setIsSidebarOpen}
@@ -159,8 +233,10 @@ const App: React.FC = () => {
               <Menu className="w-6 h-6 text-slate-600" />
             </button>
             <div className="hidden sm:flex items-center gap-2">
-              <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></div>
-              <span className="text-[11px] font-black uppercase tracking-widest text-slate-500">مؤسسة نشطة: {themeSettings.cafeAccountId}</span>
+              <div className={`w-2.5 h-2.5 rounded-full ${dbStatus === 'connected' ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'}`}></div>
+              <span className="text-[11px] font-black uppercase tracking-widest text-slate-500">
+                {dbStatus === 'connected' ? `Live Sync: ${themeSettings.cafeAccountId}` : 'غير متصل بالسحابة'}
+              </span>
             </div>
           </div>
           <div className="flex items-center gap-4">
@@ -171,26 +247,127 @@ const App: React.FC = () => {
              <img src={`https://api.dicebear.com/7.x/bottts/svg?seed=${currentUserType === 'ADMIN' ? 'admin' : currentStaffUser?.username}`} className="w-10 h-10 rounded-full bg-slate-100 p-1 border border-slate-200" alt="Avatar" />
           </div>
         </div>
+        
+        {dbStatus === 'offline' && (
+          <div className="mb-6 bg-red-50 border border-red-200 p-4 rounded-2xl flex items-center gap-3 text-red-700">
+            <WifiOff className="w-5 h-5" />
+            <p className="text-sm font-bold">تحذير: النظام غير متصل بقاعدة البيانات. تأكد من إعدادات Firebase في الكود.</p>
+          </div>
+        )}
 
         <div className="pb-10">
           {currentView === 'DASHBOARD' && <Dashboard data={appData} insight={insight} onRefreshInsights={handleRefreshInsights} isRefreshing={isRefreshingInsight} setCurrentView={setCurrentView} />}
-          {currentView === 'EMPLOYEE_PORTAL' && currentStaffUser && <EmployeePortal user={currentStaffUser} tasks={tasks} onCompleteTask={(id) => setTasks(tasks.map(t => t.id === id ? {...t, status: 'completed'} : t))} onAttendance={(type) => updateStaffAttendance(currentStaffUser.id, type)} />}
-          {currentView === 'INVENTORY_HUB' && <InventoryHub inventory={inventory} assets={assets} onAddItem={(i) => setInventory([...inventory, i])} onDeleteItem={(id) => setInventory(inventory.filter(i => i.id !== id))} onUpdateItem={(u) => setInventory(inventory.map(i => i.id === u.id ? u : i))} onAddAsset={(a) => setAssets([...assets, a])} onDeleteAsset={(id) => setAssets(assets.filter(a => a.id !== id))} onUpdateAsset={(u) => setAssets(assets.map(a => a.id === u.id ? u : a))} onWithdraw={(id, q) => setInventory(inventory.map(i => i.id === id ? {...i, quantity: Math.max(0, i.quantity - q)} : i))} onAdjust={(id, q) => setInventory(inventory.map(i => i.id === id ? {...i, quantity: q} : i))} />}
-          {currentView === 'STAFF' && <StaffManager staff={staff} onAdd={(s) => setStaff([...staff, s])} onDelete={(id) => setStaff(staff.filter(s => s.id !== id))} onUpdate={(u) => setStaff(staff.map(s => s.id === u.id ? u : s))} onAttendance={updateStaffAttendance} onSetAssignment={(id, ass) => setStaff(staff.map(s => s.id === id ? {...s, externalAssignment: ass} : s))} cafeLocation={cafeLocation} />}
+          
+          {currentView === 'EMPLOYEE_PORTAL' && currentStaffUser && (
+            <EmployeePortal 
+              user={currentStaffUser} 
+              tasks={tasks} 
+              onCompleteTask={(id) => {
+                 const t = tasks.find(x => x.id === id);
+                 if (t) saveDoc('tasks', { ...t, status: 'completed' });
+              }} 
+              onAttendance={(type) => updateStaffAttendance(currentStaffUser.id, type)} 
+            />
+          )}
+
+          {currentView === 'INVENTORY_HUB' && (
+            <InventoryHub 
+              inventory={inventory} 
+              assets={assets} 
+              onAddItem={(i) => saveDoc('inventory', i)} 
+              onDeleteItem={(id) => removeDoc('inventory', id)} 
+              onUpdateItem={(u) => saveDoc('inventory', u)} 
+              onAddAsset={(a) => saveDoc('assets', a)} 
+              onDeleteAsset={(id) => removeDoc('assets', id)} 
+              onUpdateAsset={(u) => saveDoc('assets', u)} 
+              onWithdraw={(id, q) => {
+                const item = inventory.find(i => i.id === id);
+                if (item) saveDoc('inventory', { ...item, quantity: Math.max(0, item.quantity - q) });
+              }} 
+              onAdjust={(id, q) => {
+                const item = inventory.find(i => i.id === id);
+                if (item) saveDoc('inventory', { ...item, quantity: q });
+              }} 
+            />
+          )}
+
+          {currentView === 'STAFF' && (
+            <StaffManager 
+              staff={staff} 
+              onAdd={(s) => saveDoc('staff', s)} 
+              onDelete={(id) => removeDoc('staff', id)} 
+              onUpdate={(u) => saveDoc('staff', u)} 
+              onAttendance={updateStaffAttendance} 
+              onSetAssignment={(id, ass) => {
+                const s = staff.find(x => x.id === id);
+                if (s) saveDoc('staff', { ...s, externalAssignment: ass });
+              }} 
+              cafeLocation={cafeLocation} 
+            />
+          )}
+
           {currentView === 'AI_ASSISTANT' && <AIAssistant contextData={appData} />}
           {currentView === 'REPORTS' && <Reports data={appData} />}
-          {currentView === 'DOCUMENTS' && <ComplianceTracker documents={documents} onAdd={(d) => setDocuments([...documents, d])} onDelete={(id) => setDocuments(documents.filter(doc => doc.id !== id))} />}
-          {currentView === 'TREASURY' && <TreasuryManager transactions={treasuryTransactions} onAdd={(tx) => setTreasuryTransactions([tx, ...treasuryTransactions])} onDelete={(id) => setTreasuryTransactions(treasuryTransactions.filter(t => t.id !== id))} />}
-          {currentView === 'RENTALS' && <RentalsManager rentals={rentals} onAdd={(u) => setRentals([...rentals, u])} onUpdate={(u) => setRentals(rentals.map(r => r.id === u.id ? u : r))} onDelete={(id) => setRentals(rentals.filter(r => r.id !== id))} />}
-          {currentView === 'SERVICE_SUBSCRIPTIONS' && <ServiceSubscriptions subscriptions={serviceSubscriptions} onAdd={(sub) => setServiceSubscriptions([...serviceSubscriptions, sub])} onUpdate={(u) => setServiceSubscriptions(serviceSubscriptions.map(s => s.id === u.id ? u : s))} onDelete={(id) => setServiceSubscriptions(serviceSubscriptions.filter(s => s.id !== id))} billingThreshold={billingThreshold} />}
-          {currentView === 'TASK_MANAGER' && <TaskManager tasks={tasks} staff={staff} onAddTask={(t) => setTasks([t, ...tasks])} onDeleteTask={(id) => setTasks(tasks.filter(t => t.id !== id))} />}
+          
+          {currentView === 'DOCUMENTS' && (
+            <ComplianceTracker 
+              documents={documents} 
+              onAdd={(d) => saveDoc('documents', d)} 
+              onDelete={(id) => removeDoc('documents', id)} 
+            />
+          )}
+
+          {currentView === 'TREASURY' && (
+            <TreasuryManager 
+              transactions={treasuryTransactions} 
+              onAdd={(tx) => saveDoc('treasury', tx)} 
+              onDelete={(id) => removeDoc('treasury', id)} 
+            />
+          )}
+
+          {currentView === 'RENTALS' && (
+            <RentalsManager 
+              rentals={rentals} 
+              onAdd={(u) => saveDoc('rentals', u)} 
+              onUpdate={(u) => saveDoc('rentals', u)} 
+              onDelete={(id) => removeDoc('rentals', id)} 
+            />
+          )}
+
+          {currentView === 'SERVICE_SUBSCRIPTIONS' && (
+            <ServiceSubscriptions 
+              subscriptions={serviceSubscriptions} 
+              onAdd={(sub) => saveDoc('services', sub)} 
+              onUpdate={(u) => saveDoc('services', u)} 
+              onDelete={(id) => removeDoc('services', id)} 
+              billingThreshold={billingThreshold} 
+            />
+          )}
+
+          {currentView === 'TASK_MANAGER' && (
+            <TaskManager 
+              tasks={tasks} 
+              staff={staff} 
+              onAddTask={(t) => saveDoc('tasks', t)} 
+              onDeleteTask={(id) => removeDoc('tasks', id)} 
+            />
+          )}
+
           {currentView === 'DEPLOYMENT_CENTER' && <DeploymentCenter />}
+          
           {currentView === 'SETTINGS' && (
             <Settings 
-              onReset={() => {localStorage.clear(); window.location.reload();}} 
-              cafeLocation={cafeLocation} setCafeLocation={setCafeLocation} 
-              billingThreshold={billingThreshold} setBillingThreshold={setBillingThreshold}
-              themeSettings={themeSettings} setThemeSettings={setThemeSettings}
+              onReset={() => {
+                if(confirm('هل أنت متأكد من تصفير قاعدة البيانات المحلية؟ لن يؤثر هذا على السحابة.')) {
+                   window.location.reload();
+                }
+              }} 
+              cafeLocation={cafeLocation} 
+              setCafeLocation={(loc) => saveDoc('settings', { id: 'location', ...loc })} 
+              billingThreshold={billingThreshold} 
+              setBillingThreshold={(val) => saveDoc('settings', { id: 'config', billingThreshold: val })}
+              themeSettings={themeSettings} 
+              setThemeSettings={(settings) => saveDoc('settings', { id: 'theme', ...settings })}
             />
           )}
         </div>
