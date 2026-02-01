@@ -16,15 +16,14 @@ import Login from './components/Login';
 import EmployeePortal from './components/EmployeePortal';
 import TaskManager from './components/TaskManager';
 import DeploymentCenter from './components/DeploymentCenter';
-import CloudSetup from './components/CloudSetup'; // استيراد شاشة الإعداد الجديدة
+import CloudSetup from './components/CloudSetup'; 
 import { View, InventoryItem, Asset, Staff, Document, ServiceSubscription, AttendanceLog, TreasuryTransaction, RentalUnit, UserType, Task } from './types';
-import { Menu, WifiOff } from 'lucide-react';
+import { Menu, WifiOff, ShieldAlert } from 'lucide-react';
 import { getCafeInsights } from './services/geminiService';
-import { db, isConfigured } from './services/firebase'; // استيراد حالة التهيئة
+import { db, isConfigured } from './services/firebase'; 
 import { collection, onSnapshot, doc, setDoc, deleteDoc, updateDoc } from 'firebase/firestore';
 
 const App: React.FC = () => {
-  // --- 1. التحقق من السحابة قبل أي شيء ---
   if (!isConfigured) {
     return <CloudSetup />;
   }
@@ -33,9 +32,8 @@ const App: React.FC = () => {
   const [currentStaffUser, setCurrentStaffUser] = useState<Staff | null>(null);
   const [currentView, setCurrentView] = useState<View>('DASHBOARD');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [dbStatus, setDbStatus] = useState<'connected' | 'offline'>('connected');
+  const [dbStatus, setDbStatus] = useState<'connected' | 'offline' | 'permission-denied'>('connected');
 
-  // --- تعريف الحالات (State) ---
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [assets, setAssets] = useState<Asset[]>([]);
   const [staff, setStaff] = useState<Staff[]>([]);
@@ -45,7 +43,6 @@ const App: React.FC = () => {
   const [treasuryTransactions, setTreasuryTransactions] = useState<TreasuryTransaction[]>([]);
   const [rentals, setRentals] = useState<RentalUnit[]>([]);
   
-  // الإعدادات العامة
   const [cafeLocation, setCafeLocation] = useState({ lat: 21.54105, lng: 39.17171 });
   const [billingThreshold, setBillingThreshold] = useState<number>(7);
   const [themeSettings, setThemeSettings] = useState({
@@ -58,9 +55,7 @@ const App: React.FC = () => {
   const [insight, setInsight] = useState<string>('جاري تحليل كفاءة التشغيل المباشرة...');
   const [isRefreshingInsight, setIsRefreshingInsight] = useState(false);
 
-  // --- المزامنة مع Firebase (Realtime Sync) ---
   useEffect(() => {
-    // دالة مساعدة للاشتراك في المجموعات
     const subscribe = (colName: string, setter: React.Dispatch<React.SetStateAction<any[]>>) => {
       try {
         return onSnapshot(collection(db, colName), (snapshot) => {
@@ -69,7 +64,11 @@ const App: React.FC = () => {
           setDbStatus('connected');
         }, (error) => {
           console.error(`Error fetching ${colName}:`, error);
-          setDbStatus('offline');
+          if (error.code === 'permission-denied') {
+            setDbStatus('permission-denied');
+          } else {
+            setDbStatus('offline');
+          }
         });
       } catch (e) {
         console.error("Firebase init error", e);
@@ -77,7 +76,6 @@ const App: React.FC = () => {
       }
     };
 
-    // الاشتراك في جميع البيانات
     const unsubs = [
       subscribe('inventory', setInventory),
       subscribe('assets', setAssets),
@@ -89,13 +87,14 @@ const App: React.FC = () => {
       subscribe('rentals', setRentals),
     ];
 
-    // الاشتراك في الإعدادات الفردية
     const unsubSettings = onSnapshot(collection(db, 'settings'), (snapshot) => {
        snapshot.docs.forEach(doc => {
          if (doc.id === 'theme') setThemeSettings(doc.data() as any);
          if (doc.id === 'location') setCafeLocation(doc.data() as any);
          if (doc.id === 'config') setBillingThreshold(doc.data().billingThreshold);
        });
+    }, (error) => {
+       if (error.code === 'permission-denied') setDbStatus('permission-denied');
     });
 
     return () => {
@@ -104,25 +103,30 @@ const App: React.FC = () => {
     };
   }, []);
 
-  // --- دوال التعامل مع قاعدة البيانات (CRUD Helpers) ---
   const saveDoc = async (colName: string, data: any) => {
     try {
       await setDoc(doc(db, colName, data.id), data);
-    } catch (e) {
+    } catch (e: any) {
       console.error("Error saving doc:", e);
-      alert("حدث خطأ في الحفظ، تأكد من اتصال الإنترنت");
+      if (e.code === 'permission-denied') {
+        alert("خطأ صلاحيات: قاعدة البيانات مقفلة. يرجى الذهاب إلى Firebase Console -> Firestore Database -> Rules وتغييرها إلى 'allow read, write: if true;'");
+      } else {
+        alert(`حدث خطأ في الحفظ: ${e.message}`);
+      }
     }
   };
 
   const removeDoc = async (colName: string, id: string) => {
     try {
       await deleteDoc(doc(db, colName, id));
-    } catch (e) {
+    } catch (e: any) {
       console.error("Error deleting doc:", e);
+      if (e.code === 'permission-denied') {
+        alert("خطأ صلاحيات: لا تملك إذن الحذف. تحقق من قواعد Firebase.");
+      }
     }
   };
 
-  // --- إعدادات الثيم ---
   useEffect(() => {
     document.title = `${themeSettings.systemName} - Cloud OS`;
     document.documentElement.style.setProperty('--primary-color', themeSettings.primaryColor);
@@ -139,7 +143,6 @@ const App: React.FC = () => {
   };
 
   const handleLogin = (type: 'ADMIN' | 'STAFF', credentials: { cafeId: string, username: string, password?: string }) => {
-    // في الوضع الفعلي، يجب أن يتم التحقق من قاعدة البيانات أيضاً
     if (credentials.cafeId !== themeSettings.cafeAccountId) {
       alert('رقم المؤسسة غير صحيح. يرجى مراجعة الإدارة.');
       return;
@@ -240,7 +243,7 @@ const App: React.FC = () => {
             <div className="hidden sm:flex items-center gap-2">
               <div className={`w-2.5 h-2.5 rounded-full ${dbStatus === 'connected' ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'}`}></div>
               <span className="text-[11px] font-black uppercase tracking-widest text-slate-500">
-                {dbStatus === 'connected' ? `Live Sync: ${themeSettings.cafeAccountId}` : 'جاري الاتصال بالسحابة...'}
+                {dbStatus === 'connected' ? `Live Sync: ${themeSettings.cafeAccountId}` : 'غير متصل'}
               </span>
             </div>
           </div>
@@ -253,6 +256,16 @@ const App: React.FC = () => {
           </div>
         </div>
         
+        {dbStatus === 'permission-denied' && (
+          <div className="mb-6 bg-red-50 border border-red-200 p-4 rounded-2xl flex items-center gap-3 text-red-700 animate-in fade-in">
+            <ShieldAlert className="w-6 h-6" />
+            <div>
+               <p className="text-sm font-black">خطأ في الصلاحيات (Permission Denied)</p>
+               <p className="text-xs mt-1">قاعدة البيانات مقفلة. اذهب إلى Firebase Console {'>'} Firestore {'>'} Rules واجعلها <code>allow read, write: if true;</code></p>
+            </div>
+          </div>
+        )}
+
         {dbStatus === 'offline' && (
           <div className="mb-6 bg-red-50 border border-red-200 p-4 rounded-2xl flex items-center gap-3 text-red-700 animate-in fade-in">
             <WifiOff className="w-5 h-5" />
@@ -363,12 +376,7 @@ const App: React.FC = () => {
           {currentView === 'SETTINGS' && (
             <Settings 
               onReset={() => {
-                if(confirm('هل أنت متأكد من تصفير إعدادات الاتصال؟ سيتطلب ذلك إعادة إدخال بيانات الربط.')) {
-                  // هنا يمكن استدعاء دالة resetSystemConfig من services/firebase.ts ولكننا لم نصدرها في App بعد
-                  // للسهولة، سنقوم بمسح المفتاح يدوياً
-                  localStorage.removeItem('CAFE_PRO_CLOUD_CONFIG');
-                  window.location.reload();
-                }
+                 // لا شيء هنا حالياً لأن الإعدادات ثابتة
               }} 
               cafeLocation={cafeLocation} 
               setCafeLocation={(loc) => saveDoc('settings', { id: 'location', ...loc })} 
