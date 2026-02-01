@@ -105,7 +105,9 @@ const App: React.FC = () => {
 
   const saveDoc = async (colName: string, data: any) => {
     try {
-      await setDoc(doc(db, colName, data.id), data);
+      // تنظيف البيانات من القيم غير المعرفة (undefined) لأن Firestore لا يقبلها
+      const cleanData = JSON.parse(JSON.stringify(data));
+      await setDoc(doc(db, colName, data.id), cleanData);
     } catch (e: any) {
       console.error("Error saving doc:", e);
       if (e.code === 'permission-denied') {
