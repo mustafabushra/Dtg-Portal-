@@ -103,10 +103,34 @@ const App: React.FC = () => {
     };
   }, []);
 
+  // دالة متقدمة لتنظيف البيانات من undefined بشكل متكرر
+  const sanitizeData = (obj: any): any => {
+    if (obj === null || obj === undefined) return null;
+    if (typeof obj !== 'object') return obj;
+    
+    if (Array.isArray(obj)) {
+      return obj.map(sanitizeData);
+    }
+    
+    const newObj: any = {};
+    Object.keys(obj).forEach(key => {
+      const value = obj[key];
+      if (value !== undefined) {
+        newObj[key] = sanitizeData(value);
+      }
+    });
+    return newObj;
+  };
+
   const saveDoc = async (colName: string, data: any) => {
     try {
-      // تنظيف البيانات من القيم غير المعرفة (undefined) لأن Firestore لا يقبلها
-      const cleanData = JSON.parse(JSON.stringify(data));
+      // استخدام دالة التنظيف المتقدمة بدلاً من JSON.stringify
+      const cleanData = sanitizeData(data);
+      // التأكد من عدم وجود undefined في المستوى الأول أيضاً (زيادة في الحرص)
+      if (cleanData) {
+         Object.keys(cleanData).forEach(key => cleanData[key] === undefined && delete cleanData[key]);
+      }
+      
       await setDoc(doc(db, colName, data.id), cleanData);
     } catch (e: any) {
       console.error("Error saving doc:", e);

@@ -69,16 +69,21 @@ const RentalsManager: React.FC<RentalsManagerProps> = ({ rentals, onAdd, onUpdat
     e.preventDefault();
     if (!selectedUnit) return;
     const formData = new FormData(e.currentTarget);
-    // Explicitly define status type to avoid TS conversion errors
-    const statusValue: 'paid' | 'pending' | 'overdue' = formData.get('isPaid') === 'on' ? 'paid' : 'pending';
+    
+    const isPaid = formData.get('isPaid') === 'on';
+    
     const newPayment: RentalPayment = {
       id: Math.random().toString(36).substr(2, 9),
       amount: Number(formData.get('amount')),
       dueDate: formData.get('dueDate') as string,
-      status: statusValue,
-      paidDate: formData.get('isPaid') === 'on' ? new Date().toISOString().split('T')[0] : undefined,
+      status: isPaid ? 'paid' : 'pending',
       note: formData.get('note') as string,
     };
+    
+    // إضافة تاريخ الدفع فقط إذا كانت الحالة مدفوعة
+    if (isPaid) {
+      newPayment.paidDate = new Date().toISOString().split('T')[0];
+    }
 
     const updatedUnit = {
       ...selectedUnit,
@@ -89,14 +94,30 @@ const RentalsManager: React.FC<RentalsManagerProps> = ({ rentals, onAdd, onUpdat
   };
 
   const togglePaymentStatus = (unit: RentalUnit, paymentId: string) => {
-    // Explicitly type updatedPayments and cast status to resolve union type incompatibility
-    const updatedPayments: RentalPayment[] = unit.payments.map(p => 
-      p.id === paymentId ? { 
-        ...p, 
-        status: (p.status === 'paid' ? 'pending' : 'paid') as 'paid' | 'pending' | 'overdue',
-        paidDate: p.status === 'paid' ? undefined : new Date().toISOString().split('T')[0]
-      } : p
-    );
+    const updatedPayments = unit.payments.map(p => {
+      if (p.id === paymentId) {
+        const isCurrentlyPaid = p.status === 'paid';
+        const newStatus = isCurrentlyPaid ? 'pending' : 'paid';
+        
+        // إنشاء نسخة وتحديث الحالة
+        const updatedPayment: RentalPayment = { 
+          ...p, 
+          status: newStatus 
+        };
+        
+        if (isCurrentlyPaid) {
+          // إذا كانت مدفوعة وصارت معلقة، نحذف تاريخ الدفع
+          delete (updatedPayment as any).paidDate;
+        } else {
+          // إذا كانت معلقة وصارت مدفوعة، نضيف تاريخ اليوم
+          updatedPayment.paidDate = new Date().toISOString().split('T')[0];
+        }
+        
+        return updatedPayment;
+      }
+      return p;
+    });
+    
     onUpdate({ ...unit, payments: updatedPayments });
   };
 
