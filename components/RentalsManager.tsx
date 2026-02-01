@@ -42,44 +42,47 @@ const RentalsManager: React.FC<RentalsManagerProps> = ({ rentals, onAdd, onUpdat
   );
 
   // دالة لتوليد جدول الدفعات تلقائياً بتقسيم المبلغ السنوي
+  // المنطق: قيمة الدفعة = المبلغ السنوي / (12 / مدة الدورة بالأشهر)
   const generatePaymentSchedule = (start: string, end: string, cycle: string, totalAnnualAmount: number): RentalPayment[] => {
     const payments: RentalPayment[] = [];
     let currentDate = new Date(start);
     const endDate = new Date(end);
     
-    let monthsToAdd = 1;
-    let divisionFactor = 12; // الافتراضي شهري (نقسم السنوي على 12)
+    let monthsToAdd = 1; // الافتراضي شهر واحد
+    let paymentsPerYear = 12; // الافتراضي 12 دفعة في السنة
 
-    // تحديد الفاصل الزمني ومعامل القسمة بناءً على الدورة
+    // تحديد عدد الأشهر وعدد الدفعات في السنة بناءً على الدورة
     switch (cycle) {
       case 'monthly': // شهري
         monthsToAdd = 1;
-        divisionFactor = 12;
+        paymentsPerYear = 12;
         break;
-      case 'quarterly': // كل 3 أشهر (4 دفعات في السنة)
+      case 'quarterly': // كل 3 أشهر
         monthsToAdd = 3;
-        divisionFactor = 4;
+        paymentsPerYear = 4;
         break;
-      case 'triannual': // كل 4 أشهر (3 دفعات في السنة)
+      case 'triannual': // كل 4 أشهر
         monthsToAdd = 4;
-        divisionFactor = 3;
+        paymentsPerYear = 3;
         break;
-      case 'biannual': // كل 6 أشهر (دفعتين في السنة)
+      case 'biannual': // كل 6 أشهر (نصف سنوي)
         monthsToAdd = 6;
-        divisionFactor = 2;
+        paymentsPerYear = 2;
         break;
-      case 'yearly': // سنوي (دفعة واحدة)
+      case 'yearly': // سنوي
         monthsToAdd = 12;
-        divisionFactor = 1;
+        paymentsPerYear = 1;
         break;
       default:
         monthsToAdd = 1;
-        divisionFactor = 12;
+        paymentsPerYear = 12;
     }
 
-    // حساب مبلغ الدفعة الواحدة (جبر الكسور للأقرب)
-    const amountPerPayment = Math.round(totalAnnualAmount / divisionFactor);
+    // حساب مبلغ الدفعة الواحدة (المبلغ السنوي ÷ عدد الدفعات)
+    // نستخدم Math.floor أو Math.round لتقريب الكسور، هنا سنستخدم round لأقرب عدد صحيح
+    const amountPerPayment = Math.round(totalAnnualAmount / paymentsPerYear);
 
+    // حلقة التكرار لتوليد التواريخ
     while (currentDate <= endDate) {
       payments.push({
         id: Math.random().toString(36).substr(2, 9),
@@ -88,7 +91,8 @@ const RentalsManager: React.FC<RentalsManagerProps> = ({ rentals, onAdd, onUpdat
         status: 'pending'
       });
       
-      // إضافة الأشهر للتاريخ الحالي
+      // إضافة الأشهر للتاريخ الحالي (منطق عقاري: نفس اليوم من الشهر القادم)
+      // setMonth يتعامل تلقائياً مع السنة الجديدة
       currentDate.setMonth(currentDate.getMonth() + monthsToAdd);
     }
     return payments;
@@ -104,14 +108,26 @@ const RentalsManager: React.FC<RentalsManagerProps> = ({ rentals, onAdd, onUpdat
     const startDate = formData.get('startDate') as string;
     const endDate = formData.get('endDate') as string;
 
-    // توليد الجدول:
-    // إذا كان جديداً: نولد الجدول بالكامل.
-    // إذا كان تعديل: نحتفظ بالقديم إلا إذا أراد المستخدم إعادة التوليد (حالياً سنفترض التوليد للجديد فقط أو عند تغيير التواريخ جذرياً، 
-    // لكن للتبسيط في التعديل سنحتفظ بالدفعات القديمة ما لم تكن فارغة).
-    let payments = editUnit ? editUnit.payments : [];
-    
-    if (!editUnit || payments.length === 0) {
-       payments = generatePaymentSchedule(startDate, endDate, billingCycle, rentAmount);
+    // 1. دائماً قم بتوليد الجدول الجديد بناءً على المدخلات الحالية (سواء جديد أو تعديل) لتحديث التواريخ والمبالغ
+    let generatedPayments = generatePaymentSchedule(startDate, endDate, billingCycle, rentAmount);
+
+    // 2. في حالة التعديل، حاول الحفاظ على حالة "مدفوع" للدفعات التي لها نفس تاريخ الاستحقاق
+    if (editUnit && editUnit.payments.length > 0) {
+        generatedPayments = generatedPayments.map(newPayment => {
+            // نبحث عن دفعة قديمة بنفس تاريخ الاستحقاق
+            const matchingOldPayment = editUnit.payments.find(p => p.dueDate === newPayment.dueDate);
+            
+            // إذا وجدنا دفعة قديمة وكانت "مدفوعة"، ننقل حالتها للجدول الجديد
+            if (matchingOldPayment && matchingOldPayment.status === 'paid') {
+                return {
+                    ...newPayment,
+                    status: 'paid',
+                    paidDate: matchingOldPayment.paidDate,
+                    note: matchingOldPayment.note // الاحتفاظ بالملاحظات أيضاً
+                };
+            }
+            return newPayment;
+        });
     }
 
     const newUnit: RentalUnit = {
@@ -125,7 +141,7 @@ const RentalsManager: React.FC<RentalsManagerProps> = ({ rentals, onAdd, onUpdat
       startDate,
       endDate,
       status: 'occupied',
-      payments: payments,
+      payments: generatedPayments, // نستخدم الجدول المحدث
     };
 
     editUnit ? onUpdate(newUnit) : onAdd(newUnit);
@@ -284,7 +300,7 @@ const RentalsManager: React.FC<RentalsManagerProps> = ({ rentals, onAdd, onUpdat
               <tr>
                 <th className="px-8 py-5 text-[10px] font-black text-slate-500 uppercase tracking-widest">الوحدة</th>
                 <th className="px-8 py-5 text-[10px] font-black text-slate-500 uppercase tracking-widest">المستأجر</th>
-                <th className="px-8 py-5 text-[10px] font-black text-slate-500 uppercase tracking-widest">إجمالي العقد</th>
+                <th className="px-8 py-5 text-[10px] font-black text-slate-500 uppercase tracking-widest">إجمالي العقد (سنوي)</th>
                 <th className="px-8 py-5 text-[10px] font-black text-slate-500 uppercase tracking-widest">تاريخ النهاية</th>
                 <th className="px-8 py-5 text-[10px] font-black text-slate-500 uppercase tracking-widest">الحالة المالية</th>
                 <th className="px-8 py-5 text-[10px] font-black text-slate-500 uppercase tracking-widest text-left">إجراءات</th>
