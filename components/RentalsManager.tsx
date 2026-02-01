@@ -41,23 +41,49 @@ const RentalsManager: React.FC<RentalsManagerProps> = ({ rentals, onAdd, onUpdat
       .map(p => ({ ...p, unitNumber: r.unitNumber, tenantName: r.tenantName }))
   );
 
-  // دالة لتوليد جدول الدفعات تلقائياً
-  const generatePaymentSchedule = (start: string, end: string, cycle: string, amount: number): RentalPayment[] => {
+  // دالة لتوليد جدول الدفعات تلقائياً بتقسيم المبلغ السنوي
+  const generatePaymentSchedule = (start: string, end: string, cycle: string, totalAnnualAmount: number): RentalPayment[] => {
     const payments: RentalPayment[] = [];
     let currentDate = new Date(start);
     const endDate = new Date(end);
     
-    // تحديد عدد الأشهر للإضافة بناءً على الدورة
-    let monthsToAdd = 1; // monthly
-    if (cycle === 'quarterly') monthsToAdd = 3;
-    if (cycle === 'triannual') monthsToAdd = 4;
-    if (cycle === 'biannual') monthsToAdd = 6;
-    if (cycle === 'yearly') monthsToAdd = 12;
+    let monthsToAdd = 1;
+    let divisionFactor = 12; // الافتراضي شهري (نقسم السنوي على 12)
+
+    // تحديد الفاصل الزمني ومعامل القسمة بناءً على الدورة
+    switch (cycle) {
+      case 'monthly': // شهري
+        monthsToAdd = 1;
+        divisionFactor = 12;
+        break;
+      case 'quarterly': // كل 3 أشهر (4 دفعات في السنة)
+        monthsToAdd = 3;
+        divisionFactor = 4;
+        break;
+      case 'triannual': // كل 4 أشهر (3 دفعات في السنة)
+        monthsToAdd = 4;
+        divisionFactor = 3;
+        break;
+      case 'biannual': // كل 6 أشهر (دفعتين في السنة)
+        monthsToAdd = 6;
+        divisionFactor = 2;
+        break;
+      case 'yearly': // سنوي (دفعة واحدة)
+        monthsToAdd = 12;
+        divisionFactor = 1;
+        break;
+      default:
+        monthsToAdd = 1;
+        divisionFactor = 12;
+    }
+
+    // حساب مبلغ الدفعة الواحدة (جبر الكسور للأقرب)
+    const amountPerPayment = Math.round(totalAnnualAmount / divisionFactor);
 
     while (currentDate <= endDate) {
       payments.push({
         id: Math.random().toString(36).substr(2, 9),
-        amount: amount,
+        amount: amountPerPayment,
         dueDate: currentDate.toISOString().split('T')[0],
         status: 'pending'
       });
@@ -73,17 +99,18 @@ const RentalsManager: React.FC<RentalsManagerProps> = ({ rentals, onAdd, onUpdat
     const formData = new FormData(e.currentTarget);
     const id = editUnit ? editUnit.id : Math.random().toString(36).substr(2, 9);
     
-    const rentAmount = Number(formData.get('rentAmount'));
+    const rentAmount = Number(formData.get('rentAmount')); // هذا هو المبلغ السنوي الآن
     const billingCycle = formData.get('billingCycle') as any;
     const startDate = formData.get('startDate') as string;
     const endDate = formData.get('endDate') as string;
 
-    // إذا كان عقد جديد، نقوم بتوليد الدفعات تلقائياً
-    // إذا كان تعديل، نحتفظ بالدفعات القديمة (لتجنب حذف السجلات المدفوعة)
+    // توليد الجدول:
+    // إذا كان جديداً: نولد الجدول بالكامل.
+    // إذا كان تعديل: نحتفظ بالقديم إلا إذا أراد المستخدم إعادة التوليد (حالياً سنفترض التوليد للجديد فقط أو عند تغيير التواريخ جذرياً، 
+    // لكن للتبسيط في التعديل سنحتفظ بالدفعات القديمة ما لم تكن فارغة).
     let payments = editUnit ? editUnit.payments : [];
     
-    // إذا كان جديداً تماماً، قم بتوليد الجدول
-    if (!editUnit) {
+    if (!editUnit || payments.length === 0) {
        payments = generatePaymentSchedule(startDate, endDate, billingCycle, rentAmount);
     }
 
@@ -93,7 +120,7 @@ const RentalsManager: React.FC<RentalsManagerProps> = ({ rentals, onAdd, onUpdat
       type: formData.get('type') as any,
       tenantName: formData.get('tenantName') as string,
       tenantPhone: formData.get('tenantPhone') as string,
-      rentAmount,
+      rentAmount, // نحفظ المبلغ السنوي هنا
       billingCycle,
       startDate,
       endDate,
@@ -257,7 +284,7 @@ const RentalsManager: React.FC<RentalsManagerProps> = ({ rentals, onAdd, onUpdat
               <tr>
                 <th className="px-8 py-5 text-[10px] font-black text-slate-500 uppercase tracking-widest">الوحدة</th>
                 <th className="px-8 py-5 text-[10px] font-black text-slate-500 uppercase tracking-widest">المستأجر</th>
-                <th className="px-8 py-5 text-[10px] font-black text-slate-500 uppercase tracking-widest">مبلغ الإيجار</th>
+                <th className="px-8 py-5 text-[10px] font-black text-slate-500 uppercase tracking-widest">إجمالي العقد</th>
                 <th className="px-8 py-5 text-[10px] font-black text-slate-500 uppercase tracking-widest">تاريخ النهاية</th>
                 <th className="px-8 py-5 text-[10px] font-black text-slate-500 uppercase tracking-widest">الحالة المالية</th>
                 <th className="px-8 py-5 text-[10px] font-black text-slate-500 uppercase tracking-widest text-left">إجراءات</th>
@@ -351,8 +378,8 @@ const RentalsManager: React.FC<RentalsManagerProps> = ({ rentals, onAdd, onUpdat
                   <input name="tenantPhone" defaultValue={editUnit?.tenantPhone} required className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold" />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-xs font-black text-slate-500">مبلغ الإيجار الدوري</label>
-                  <input name="rentAmount" type="number" defaultValue={editUnit?.rentAmount} required className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold" />
+                  <label className="text-xs font-black text-slate-500 text-amber-600">إجمالي قيمة العقد (سنوي)</label>
+                  <input name="rentAmount" type="number" defaultValue={editUnit?.rentAmount} required className="w-full p-3 bg-amber-50 border border-amber-200 rounded-xl outline-none font-bold" placeholder="مثلاً: 24000" />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
@@ -366,13 +393,13 @@ const RentalsManager: React.FC<RentalsManagerProps> = ({ rentals, onAdd, onUpdat
                 </div>
               </div>
               <div className="space-y-1">
-                <label className="text-xs font-black text-slate-500">دورة الفوترة (توليد تلقائي)</label>
+                <label className="text-xs font-black text-slate-500">دورة الفوترة (تقسيم تلقائي)</label>
                 <select name="billingCycle" defaultValue={editUnit?.billingCycle} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold">
-                  <option value="monthly">شهرياً (كل شهر)</option>
-                  <option value="quarterly">ربع سنوي (كل 3 أشهر)</option>
-                  <option value="triannual">كل 4 أشهر</option>
-                  <option value="biannual">نصف سنوي (كل 6 أشهر)</option>
-                  <option value="yearly">سنوياً (كل سنة)</option>
+                  <option value="monthly">شهرياً (المبلغ السنوي / 12)</option>
+                  <option value="quarterly">ربع سنوي (المبلغ السنوي / 4)</option>
+                  <option value="triannual">كل 4 أشهر (المبلغ السنوي / 3)</option>
+                  <option value="biannual">نصف سنوي (المبلغ السنوي / 2)</option>
+                  <option value="yearly">سنوياً (دفعة واحدة)</option>
                 </select>
               </div>
               <button type="submit" className="w-full py-4 bg-slate-900 text-white rounded-[1.5rem] font-black text-lg hover:bg-amber-500 hover:text-slate-900 transition-all active:scale-95 shadow-xl">
