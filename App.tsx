@@ -16,13 +16,19 @@ import Login from './components/Login';
 import EmployeePortal from './components/EmployeePortal';
 import TaskManager from './components/TaskManager';
 import DeploymentCenter from './components/DeploymentCenter';
+import CloudSetup from './components/CloudSetup'; // استيراد شاشة الإعداد الجديدة
 import { View, InventoryItem, Asset, Staff, Document, ServiceSubscription, AttendanceLog, TreasuryTransaction, RentalUnit, UserType, Task } from './types';
 import { Menu, WifiOff } from 'lucide-react';
 import { getCafeInsights } from './services/geminiService';
-import { db } from './services/firebase';
+import { db, isConfigured } from './services/firebase'; // استيراد حالة التهيئة
 import { collection, onSnapshot, doc, setDoc, deleteDoc, updateDoc } from 'firebase/firestore';
 
 const App: React.FC = () => {
+  // --- 1. التحقق من السحابة قبل أي شيء ---
+  if (!isConfigured) {
+    return <CloudSetup />;
+  }
+
   const [currentUserType, setCurrentUserType] = useState<UserType>(null);
   const [currentStaffUser, setCurrentStaffUser] = useState<Staff | null>(null);
   const [currentView, setCurrentView] = useState<View>('DASHBOARD');
@@ -39,7 +45,7 @@ const App: React.FC = () => {
   const [treasuryTransactions, setTreasuryTransactions] = useState<TreasuryTransaction[]>([]);
   const [rentals, setRentals] = useState<RentalUnit[]>([]);
   
-  // الإعدادات العامة (يتم جلبها كوثائق منفصلة)
+  // الإعدادات العامة
   const [cafeLocation, setCafeLocation] = useState({ lat: 21.54105, lng: 39.17171 });
   const [billingThreshold, setBillingThreshold] = useState<number>(7);
   const [themeSettings, setThemeSettings] = useState({
@@ -104,7 +110,7 @@ const App: React.FC = () => {
       await setDoc(doc(db, colName, data.id), data);
     } catch (e) {
       console.error("Error saving doc:", e);
-      alert("حدث خطأ في الحفظ، تأكد من إعدادات Firebase");
+      alert("حدث خطأ في الحفظ، تأكد من اتصال الإنترنت");
     }
   };
 
@@ -134,7 +140,6 @@ const App: React.FC = () => {
 
   const handleLogin = (type: 'ADMIN' | 'STAFF', credentials: { cafeId: string, username: string, password?: string }) => {
     // في الوضع الفعلي، يجب أن يتم التحقق من قاعدة البيانات أيضاً
-    // للتسهيل حالياً، سنعتمد على البيانات المحملة من Firebase
     if (credentials.cafeId !== themeSettings.cafeAccountId) {
       alert('رقم المؤسسة غير صحيح. يرجى مراجعة الإدارة.');
       return;
@@ -235,7 +240,7 @@ const App: React.FC = () => {
             <div className="hidden sm:flex items-center gap-2">
               <div className={`w-2.5 h-2.5 rounded-full ${dbStatus === 'connected' ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'}`}></div>
               <span className="text-[11px] font-black uppercase tracking-widest text-slate-500">
-                {dbStatus === 'connected' ? `Live Sync: ${themeSettings.cafeAccountId}` : 'غير متصل بالسحابة'}
+                {dbStatus === 'connected' ? `Live Sync: ${themeSettings.cafeAccountId}` : 'جاري الاتصال بالسحابة...'}
               </span>
             </div>
           </div>
@@ -249,9 +254,9 @@ const App: React.FC = () => {
         </div>
         
         {dbStatus === 'offline' && (
-          <div className="mb-6 bg-red-50 border border-red-200 p-4 rounded-2xl flex items-center gap-3 text-red-700">
+          <div className="mb-6 bg-red-50 border border-red-200 p-4 rounded-2xl flex items-center gap-3 text-red-700 animate-in fade-in">
             <WifiOff className="w-5 h-5" />
-            <p className="text-sm font-bold">تحذير: النظام غير متصل بقاعدة البيانات. تأكد من إعدادات Firebase في الكود.</p>
+            <p className="text-sm font-bold">تنبيه: الاتصال بالسحابة غير مستقر. تأكد من إعدادات الإنترنت.</p>
           </div>
         )}
 
@@ -358,8 +363,11 @@ const App: React.FC = () => {
           {currentView === 'SETTINGS' && (
             <Settings 
               onReset={() => {
-                if(confirm('هل أنت متأكد من تصفير قاعدة البيانات المحلية؟ لن يؤثر هذا على السحابة.')) {
-                   window.location.reload();
+                if(confirm('هل أنت متأكد من تصفير إعدادات الاتصال؟ سيتطلب ذلك إعادة إدخال بيانات الربط.')) {
+                  // هنا يمكن استدعاء دالة resetSystemConfig من services/firebase.ts ولكننا لم نصدرها في App بعد
+                  // للسهولة، سنقوم بمسح المفتاح يدوياً
+                  localStorage.removeItem('CAFE_PRO_CLOUD_CONFIG');
+                  window.location.reload();
                 }
               }} 
               cafeLocation={cafeLocation} 
