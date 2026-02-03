@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { Plus, Search, Trash2, Edit, X, Package, Wrench, Image as ImageIcon, AlertCircle, History, DollarSign, Calendar, FileText, Clock } from 'lucide-react';
+import { Plus, Search, Trash2, Edit, X, Package, Wrench, Image as ImageIcon, AlertCircle, History, DollarSign, Calendar, FileText, Clock, Utensils, Wine, Box } from 'lucide-react';
 import { InventoryItem, Asset, Category, MaintenanceRecord } from '../types';
 import { useLanguage } from '../contexts/LanguageContext';
 
@@ -20,13 +20,19 @@ const InventoryManager: React.FC<InventoryManagerProps> = ({
 }) => {
   const { t, dir } = useLanguage();
   const [tab, setTab] = useState<'STOCK' | 'ASSETS'>('STOCK');
+  const [categoryFilter, setCategoryFilter] = useState<'ALL' | Category>('ALL'); // فلتر الأقسام
   const [showModal, setShowModal] = useState(false);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [editItem, setEditItem] = useState<InventoryItem | Asset | null>(null);
   const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
   const [search, setSearch] = useState('');
 
-  const filteredStock = inventory.filter(i => i.name.toLowerCase().includes(search.toLowerCase()));
+  const filteredStock = inventory.filter(i => {
+    const matchesSearch = i.name.toLowerCase().includes(search.toLowerCase());
+    const matchesCategory = categoryFilter === 'ALL' || i.category === categoryFilter;
+    return matchesSearch && matchesCategory;
+  });
+
   const filteredAssets = assets.filter(a => a.name.toLowerCase().includes(search.toLowerCase()));
 
   const handleOpenAdd = () => {
@@ -131,6 +137,8 @@ const InventoryManager: React.FC<InventoryManagerProps> = ({
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
+      
+      {/* Main Tabs (Stock vs Assets) */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex bg-white p-1.5 rounded-2xl shadow-sm border border-slate-200">
           <button onClick={() => setTab('STOCK')} className={`flex items-center gap-2 px-8 py-3 rounded-xl text-sm font-black transition-all ${tab === 'STOCK' ? 'bg-slate-900 text-white shadow-lg' : 'text-slate-500 hover:bg-slate-50'}`}>
@@ -142,11 +150,42 @@ const InventoryManager: React.FC<InventoryManagerProps> = ({
             {t('inv_assets_equipment')}
           </button>
         </div>
+
         <button onClick={handleOpenAdd} className="flex items-center gap-2 bg-amber-500 text-slate-900 px-6 py-3 rounded-2xl font-black hover:bg-amber-400 transition-all active:scale-95 shadow-xl shadow-amber-500/10">
           <Plus className="w-5 h-5" />
           {tab === 'STOCK' ? t('inv_btn_add_stock') : t('inv_btn_add_asset')}
         </button>
       </div>
+
+      {/* Sub Filters for Stock (Kitchen/Bar/Store/All) */}
+      {tab === 'STOCK' && (
+        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-2">
+           <button 
+             onClick={() => setCategoryFilter('ALL')} 
+             className={`px-4 py-2 rounded-xl text-xs font-black transition-all border ${categoryFilter === 'ALL' ? 'bg-slate-800 text-white border-slate-800' : 'bg-white text-slate-500 border-slate-200 hover:border-slate-300'}`}
+           >
+             {t('inv_filter_all')}
+           </button>
+           <button 
+             onClick={() => setCategoryFilter(Category.KITCHEN)} 
+             className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black transition-all border ${categoryFilter === Category.KITCHEN ? 'bg-orange-500 text-white border-orange-500 shadow-lg shadow-orange-500/20' : 'bg-white text-slate-500 border-slate-200 hover:border-orange-200 hover:text-orange-500'}`}
+           >
+             <Utensils className="w-3 h-3" /> {t('inv_filter_kitchen')}
+           </button>
+           <button 
+             onClick={() => setCategoryFilter(Category.BAR)} 
+             className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black transition-all border ${categoryFilter === Category.BAR ? 'bg-blue-500 text-white border-blue-500 shadow-lg shadow-blue-500/20' : 'bg-white text-slate-500 border-slate-200 hover:border-blue-200 hover:text-blue-500'}`}
+           >
+             <Wine className="w-3 h-3" /> {t('inv_filter_bar')}
+           </button>
+           <button 
+             onClick={() => setCategoryFilter(Category.STORE)} 
+             className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black transition-all border ${categoryFilter === Category.STORE ? 'bg-emerald-500 text-white border-emerald-500 shadow-lg shadow-emerald-500/20' : 'bg-white text-slate-500 border-slate-200 hover:border-emerald-200 hover:text-emerald-500'}`}
+           >
+             <Box className="w-3 h-3" /> {t('inv_filter_store')}
+           </button>
+        </div>
+      )}
 
       <div className="bg-white rounded-[2rem] shadow-sm border border-slate-200 overflow-hidden">
         <div className="p-6 border-b border-slate-100 flex items-center gap-4 bg-slate-50/50">
@@ -203,7 +242,7 @@ const InventoryManager: React.FC<InventoryManagerProps> = ({
                       </div>
                     </td>
                     <td className="px-8 py-5 text-sm font-black text-slate-900">{item.name}</td>
-                    <td className="px-8 py-5"><span className={`px-3 py-1 rounded-lg text-[10px] font-black ${item.category === Category.KITCHEN ? 'bg-orange-100 text-orange-700' : 'bg-blue-100 text-blue-700'}`}>{item.category}</span></td>
+                    <td className="px-8 py-5"><span className={`px-3 py-1 rounded-lg text-[10px] font-black ${item.category === Category.KITCHEN ? 'bg-orange-100 text-orange-700' : item.category === Category.BAR ? 'bg-blue-100 text-blue-700' : 'bg-emerald-100 text-emerald-700'}`}>{item.category}</span></td>
                     <td className="px-8 py-5 text-sm font-bold text-slate-700">{item.quantity} {item.unit}</td>
                     <td className={`px-8 py-5 text-xs font-bold ${urgentExpiry ? 'text-rose-600' : 'text-slate-500'}`}>
                       <div className="flex items-center gap-2">
@@ -279,7 +318,7 @@ const InventoryManager: React.FC<InventoryManagerProps> = ({
                      </div>
                      <div>
                         <h4 className="text-sm font-black text-slate-900">{item.name}</h4>
-                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${item.category === Category.KITCHEN ? 'bg-orange-100 text-orange-700' : 'bg-blue-100 text-blue-700'}`}>{item.category}</span>
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${item.category === Category.KITCHEN ? 'bg-orange-100 text-orange-700' : item.category === Category.BAR ? 'bg-blue-100 text-blue-700' : 'bg-emerald-100 text-emerald-700'}`}>{item.category}</span>
                      </div>
                   </div>
                   <div className="flex flex-col items-end">
@@ -333,7 +372,12 @@ const InventoryManager: React.FC<InventoryManagerProps> = ({
                 <>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2"><label className="text-xs font-black text-slate-500">{t('inv_label_name')}</label><input name="name" defaultValue={editItem?.name} required className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl focus:ring-4 ring-amber-500/10 outline-none font-bold" /></div>
-                    <div className="space-y-2"><label className="text-xs font-black text-slate-500">{t('inv_label_category')}</label><select name="category" defaultValue={(editItem as any)?.category} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold"><option value={Category.KITCHEN}>{t('inv_cat_kitchen')}</option><option value={Category.BAR}>{t('inv_cat_bar')}</option></select></div>
+                    <div className="space-y-2"><label className="text-xs font-black text-slate-500">{t('inv_label_category')}</label>
+                    <select name="category" defaultValue={(editItem as any)?.category} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold">
+                        <option value={Category.KITCHEN}>{t('inv_cat_kitchen')}</option>
+                        <option value={Category.BAR}>{t('inv_cat_bar')}</option>
+                        <option value={Category.STORE}>{t('inv_cat_store')}</option>
+                    </select></div>
                   </div>
                   <div className="grid grid-cols-3 gap-4">
                     <div className="space-y-2"><label className="text-xs font-black text-slate-500">{t('inv_label_qty')}</label><input name="quantity" defaultValue={(editItem as any)?.quantity} type="number" required className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold" /></div>

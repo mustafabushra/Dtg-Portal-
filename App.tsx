@@ -311,11 +311,20 @@ const App: React.FC = () => {
         </div>
         
         {dbStatus === 'permission-denied' && (
-          <div className="mb-6 bg-red-50 border border-red-200 p-4 rounded-2xl flex items-center gap-3 text-red-700 animate-in fade-in">
-            <ShieldAlert className="w-6 h-6" />
-            <div>
-               <p className="text-sm font-black">{t('permissionDenied')}</p>
-               <p className="text-xs mt-1">Check Firebase Console Rules.</p>
+          <div className="mb-6 bg-red-50 border border-red-200 p-6 rounded-2xl flex flex-col md:flex-row items-start md:items-center gap-4 text-red-800 animate-in fade-in shadow-lg">
+            <div className="p-3 bg-red-100 rounded-full shrink-0">
+              <ShieldAlert className="w-8 h-8 text-red-600" />
+            </div>
+            <div className="flex-1">
+               <h3 className="text-lg font-black">{t('permissionDenied')} (قواعد الأمان)</h3>
+               <p className="text-sm mt-1 leading-relaxed">
+                 لم يتمكن النظام من الوصول لقاعدة البيانات. هذا بسبب قواعد الأمان (Security Rules).
+                 <br/>
+                 <strong>الحل السريع (للمطورين):</strong> قم بنشر قواعد الأمان المرفقة (firestore.rules) عبر الأمر:
+                 <code className="mx-1 px-2 py-0.5 bg-red-100 rounded text-red-900 font-mono text-xs">firebase deploy --only firestore</code>
+                 <br/>
+                 أو قم بتغيير القواعد يدوياً في <a href="https://console.firebase.google.com" target="_blank" className="underline font-bold hover:text-red-950">Firebase Console</a> إلى وضع الاختبار (Test Mode).
+               </p>
             </div>
           </div>
         )}

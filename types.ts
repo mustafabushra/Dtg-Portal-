@@ -2,6 +2,7 @@
 export enum Category {
   KITCHEN = 'مطبخ',
   BAR = 'بار',
+  STORE = 'مخزن',
   ASSET = 'أصول'
 }
 

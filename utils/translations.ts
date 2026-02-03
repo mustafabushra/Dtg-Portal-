@@ -74,10 +74,10 @@ export const translations = {
     quick_access: "الوصول السريع للأقسام",
     
     // Inventory Hub
-    inv_tab_consumption: "استهلاك",
-    inv_tab_records: "السجلات",
-    inv_tab_adjust: "الجرد",
-    inv_quick_consume: "استهلاك سريع",
+    inv_tab_consumption: "استهلاك يومي",
+    inv_tab_records: "إدارة المخزون والأصول",
+    inv_tab_adjust: "الجرد والتسوية",
+    inv_quick_consume: "شاشة الاستهلاك السريع",
     inv_available: "المتوفر",
     inv_alerts: "تنبيهات هامة",
     inv_low_stock: "نواقص الكميات",
@@ -85,6 +85,10 @@ export const translations = {
     inv_no_low_stock: "لا توجد نواقص",
     inv_no_expiry: "لا توجد أصناف منتهية قريباً",
     inv_remaining: "متبقي",
+    inv_filter_all: "الكل",
+    inv_filter_kitchen: "المطبخ",
+    inv_filter_bar: "البار",
+    inv_filter_store: "المخزن",
 
     // Inventory Manager
     inv_stock_inventory: "المخزون السلعي",
@@ -112,6 +116,7 @@ export const translations = {
     inv_label_category: "القسم",
     inv_cat_kitchen: "مطبخ",
     inv_cat_bar: "بار",
+    inv_cat_store: "مخزن",
     inv_label_qty: "الكمية",
     inv_label_unit: "الوحدة",
     inv_label_min: "الحد الأدنى",
@@ -377,6 +382,10 @@ export const translations = {
     inv_no_low_stock: "No items low in stock",
     inv_no_expiry: "No items expiring soon",
     inv_remaining: "remaining",
+    inv_filter_all: "All",
+    inv_filter_kitchen: "Kitchen",
+    inv_filter_bar: "Bar",
+    inv_filter_store: "Store",
 
     // Inventory Manager
     inv_stock_inventory: "Stock Inventory",
@@ -404,6 +413,7 @@ export const translations = {
     inv_label_category: "Category",
     inv_cat_kitchen: "Kitchen",
     inv_cat_bar: "Bar",
+    inv_cat_store: "Store",
     inv_label_qty: "Quantity",
     inv_label_unit: "Unit",
     inv_label_min: "Minimum Limit",

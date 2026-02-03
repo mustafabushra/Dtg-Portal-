@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { 
-  MinusCircle, Scale, LayoutGrid, AlertCircle, ShoppingCart, Coffee, PackageCheck, Clock
+  MinusCircle, Scale, LayoutGrid, AlertCircle, ShoppingCart, Coffee, PackageCheck, Clock, Utensils, Wine, Box
 } from 'lucide-react';
 import InventoryManager from './InventoryManager';
 import StockAdjustment from './StockAdjustment';
@@ -26,12 +26,21 @@ const InventoryHub: React.FC<InventoryHubProps> = ({
 }) => {
   const { t } = useLanguage();
   const [activeTab, setActiveTab] = useState<'MANAGEMENT' | 'BARISTA_VIEW' | 'ADJUST'>('BARISTA_VIEW');
+  const [consumptionFilter, setConsumptionFilter] = useState<'ALL' | Category>('ALL'); // فلتر للاستهلاك السريع
 
   const lowStock = inventory.filter(i => i.quantity <= i.minLimit);
   const expiringStock = inventory.filter(i => {
     if (!i.expiryDate) return false;
     const diff = new Date(i.expiryDate).getTime() - new Date().getTime();
     return diff < (7 * 24 * 3600 * 1000);
+  });
+
+  // تصفية المواد المعروضة للاستهلاك بناءً على الفلتر
+  const displayedConsumptionItems = inventory.filter(i => {
+    // We allow consumption for Kitchen, Bar and Store items
+    const isConsumable = i.category === Category.BAR || i.category === Category.KITCHEN || i.category === Category.STORE;
+    const matchesFilter = consumptionFilter === 'ALL' || i.category === consumptionFilter;
+    return isConsumable && matchesFilter;
   });
 
   return (
@@ -56,11 +65,20 @@ const InventoryHub: React.FC<InventoryHubProps> = ({
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 md:gap-8">
            <div className="lg:col-span-3 space-y-4 md:space-y-6">
               <div className="bg-white p-4 md:p-10 rounded-2xl md:rounded-[3rem] shadow-sm border border-slate-200">
-                 <div className="flex items-center justify-between mb-6 md:mb-10">
+                 <div className="flex flex-col md:flex-row items-center justify-between mb-6 md:mb-10 gap-4">
                     <h2 className="text-lg md:text-2xl font-black text-slate-900 flex items-center gap-3"><MinusCircle className="w-5 h-5 md:w-7 md:h-7 text-rose-500" /> {t('inv_quick_consume')}</h2>
+                    
+                    {/* فلاتر الاستهلاك */}
+                    <div className="flex bg-slate-100 p-1 rounded-xl overflow-x-auto no-scrollbar max-w-full">
+                       <button onClick={() => setConsumptionFilter('ALL')} className={`px-4 py-2 rounded-lg text-[10px] font-black transition-all whitespace-nowrap ${consumptionFilter === 'ALL' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500'}`}>{t('inv_filter_all')}</button>
+                       <button onClick={() => setConsumptionFilter(Category.KITCHEN)} className={`px-4 py-2 rounded-lg text-[10px] font-black transition-all flex items-center gap-1 whitespace-nowrap ${consumptionFilter === Category.KITCHEN ? 'bg-white shadow-sm text-orange-600' : 'text-slate-500'}`}><Utensils className="w-3 h-3" /> {t('inv_filter_kitchen')}</button>
+                       <button onClick={() => setConsumptionFilter(Category.BAR)} className={`px-4 py-2 rounded-lg text-[10px] font-black transition-all flex items-center gap-1 whitespace-nowrap ${consumptionFilter === Category.BAR ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500'}`}><Wine className="w-3 h-3" /> {t('inv_filter_bar')}</button>
+                       <button onClick={() => setConsumptionFilter(Category.STORE)} className={`px-4 py-2 rounded-lg text-[10px] font-black transition-all flex items-center gap-1 whitespace-nowrap ${consumptionFilter === Category.STORE ? 'bg-white shadow-sm text-emerald-600' : 'text-slate-500'}`}><Box className="w-3 h-3" /> {t('inv_filter_store')}</button>
+                    </div>
                  </div>
+
                  <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 md:gap-6">
-                    {inventory.filter(i => i.category === Category.BAR || i.category === Category.KITCHEN).map(item => (
+                    {displayedConsumptionItems.map(item => (
                       <div key={item.id} className="bg-slate-50 p-4 md:p-6 rounded-2xl md:rounded-[2.5rem] border border-slate-200 flex flex-col gap-4 md:gap-6 group hover:bg-white hover:shadow-xl transition-all relative overflow-hidden">
                         <div className="flex items-center gap-3 md:gap-4 relative z-10">
                            <div className="w-10 h-10 md:w-14 md:h-14 rounded-lg md:rounded-2xl bg-white border border-slate-200 flex items-center justify-center font-black text-lg md:text-xl text-slate-300 group-hover:bg-amber-500 group-hover:text-slate-900 transition-colors">
@@ -78,6 +96,11 @@ const InventoryHub: React.FC<InventoryHubProps> = ({
                         <div className={`absolute bottom-0 right-0 left-0 h-1 ${item.quantity <= item.minLimit ? 'bg-rose-500 animate-pulse' : 'bg-transparent'}`}></div>
                       </div>
                     ))}
+                    {displayedConsumptionItems.length === 0 && (
+                      <div className="col-span-full py-10 text-center text-slate-400 font-bold text-xs italic">
+                        لا توجد أصناف في هذا القسم حالياً.
+                      </div>
+                    )}
                  </div>
               </div>
            </div>
