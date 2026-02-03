@@ -6,6 +6,7 @@ import {
 import InventoryManager from './InventoryManager';
 import StockAdjustment from './StockAdjustment';
 import { InventoryItem, Asset, Category } from '../types';
+import { useLanguage } from '../contexts/LanguageContext';
 
 interface InventoryHubProps {
   inventory: InventoryItem[];
@@ -23,6 +24,7 @@ interface InventoryHubProps {
 const InventoryHub: React.FC<InventoryHubProps> = ({
   inventory, assets, onAddItem, onDeleteItem, onUpdateItem, onAddAsset, onDeleteAsset, onUpdateAsset, onWithdraw, onAdjust
 }) => {
+  const { t } = useLanguage();
   const [activeTab, setActiveTab] = useState<'MANAGEMENT' | 'BARISTA_VIEW' | 'ADJUST'>('BARISTA_VIEW');
 
   const lowStock = inventory.filter(i => i.quantity <= i.minLimit);
@@ -36,9 +38,9 @@ const InventoryHub: React.FC<InventoryHubProps> = ({
     <div className="space-y-6 md:space-y-8 animate-in fade-in duration-500">
       <div className="flex bg-white p-1 md:p-2 rounded-xl md:rounded-[1.5rem] shadow-sm border border-slate-200 w-full md:w-fit overflow-x-auto no-scrollbar">
         {[
-          { id: 'BARISTA_VIEW', label: 'استهلاك', icon: Coffee },
-          { id: 'MANAGEMENT', label: 'السجلات', icon: LayoutGrid },
-          { id: 'ADJUST', label: 'الجرد', icon: Scale },
+          { id: 'BARISTA_VIEW', label: t('inv_tab_consumption'), icon: Coffee },
+          { id: 'MANAGEMENT', label: t('inv_tab_records'), icon: LayoutGrid },
+          { id: 'ADJUST', label: t('inv_tab_adjust'), icon: Scale },
         ].map(tab => (
           <button 
             key={tab.id}
@@ -55,7 +57,7 @@ const InventoryHub: React.FC<InventoryHubProps> = ({
            <div className="lg:col-span-3 space-y-4 md:space-y-6">
               <div className="bg-white p-4 md:p-10 rounded-2xl md:rounded-[3rem] shadow-sm border border-slate-200">
                  <div className="flex items-center justify-between mb-6 md:mb-10">
-                    <h2 className="text-lg md:text-2xl font-black text-slate-900 flex items-center gap-3"><MinusCircle className="w-5 h-5 md:w-7 md:h-7 text-rose-500" /> استهلاك سريع</h2>
+                    <h2 className="text-lg md:text-2xl font-black text-slate-900 flex items-center gap-3"><MinusCircle className="w-5 h-5 md:w-7 md:h-7 text-rose-500" /> {t('inv_quick_consume')}</h2>
                  </div>
                  <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 md:gap-6">
                     {inventory.filter(i => i.category === Category.BAR || i.category === Category.KITCHEN).map(item => (
@@ -66,7 +68,7 @@ const InventoryHub: React.FC<InventoryHubProps> = ({
                            </div>
                            <div className="min-w-0">
                              <p className="text-xs md:text-sm font-black text-slate-900 truncate">{item.name}</p>
-                             <p className="text-[9px] md:text-[10px] font-black text-slate-400 mt-0.5">المتوفر: {item.quantity} {item.unit}</p>
+                             <p className="text-[9px] md:text-[10px] font-black text-slate-400 mt-0.5">{t('inv_available')}: {item.quantity} {item.unit}</p>
                            </div>
                         </div>
                         <div className="flex gap-2 md:gap-3 relative z-10">
@@ -83,24 +85,24 @@ const InventoryHub: React.FC<InventoryHubProps> = ({
            <div className="space-y-6">
               <div className="bg-slate-900 text-white p-6 md:p-8 rounded-2xl md:rounded-[2.5rem] shadow-2xl relative overflow-hidden border-b-4 md:border-b-8 border-rose-500">
                  <div className="absolute top-0 right-0 w-32 h-32 bg-rose-500/10 rounded-full blur-3xl"></div>
-                 <h3 className="text-xs md:text-sm font-black text-rose-400 mb-4 md:mb-6 flex items-center gap-2 tracking-widest uppercase"><AlertCircle className="w-4 h-4 md:w-5 md:h-5" /> تنبيهات هامة</h3>
+                 <h3 className="text-xs md:text-sm font-black text-rose-400 mb-4 md:mb-6 flex items-center gap-2 tracking-widest uppercase"><AlertCircle className="w-4 h-4 md:w-5 md:h-5" /> {t('inv_alerts')}</h3>
                  
                  <div className="space-y-4 relative z-10">
                     {/* Low Stock Alerts */}
                     <div className="space-y-2">
-                      <p className="text-[9px] font-black text-slate-500 uppercase">نواقص الكميات</p>
+                      <p className="text-[9px] font-black text-slate-500 uppercase">{t('inv_low_stock')}</p>
                       {lowStock.map(item => (
                         <div key={item.id} className="bg-white/5 p-3 rounded-xl flex items-center justify-between border border-white/10">
                            <p className="text-[11px] font-black">{item.name}</p>
-                           <p className="text-[9px] text-rose-400 font-bold">{item.quantity} متبقي</p>
+                           <p className="text-[9px] text-rose-400 font-bold">{item.quantity} {t('inv_remaining')}</p>
                         </div>
                       ))}
-                      {lowStock.length === 0 && <p className="text-[9px] text-slate-500 italic">لا توجد نواقص</p>}
+                      {lowStock.length === 0 && <p className="text-[9px] text-slate-500 italic">{t('inv_no_low_stock')}</p>}
                     </div>
 
                     {/* Expiry Alerts */}
                     <div className="space-y-2 pt-2 border-t border-white/5">
-                      <p className="text-[9px] font-black text-slate-500 uppercase">انتهاء الصلاحية</p>
+                      <p className="text-[9px] font-black text-slate-500 uppercase">{t('inv_expiry_alert')}</p>
                       {expiringStock.map(item => (
                         <div key={`exp-${item.id}`} className="bg-white/5 p-3 rounded-xl flex items-center justify-between border border-white/10">
                            <div className="flex items-center gap-2">
@@ -110,7 +112,7 @@ const InventoryHub: React.FC<InventoryHubProps> = ({
                            <p className="text-[9px] text-rose-400 font-bold">{item.expiryDate}</p>
                         </div>
                       ))}
-                      {expiringStock.length === 0 && <p className="text-[9px] text-slate-500 italic">لا توجد أصناف منتهية قريباً</p>}
+                      {expiringStock.length === 0 && <p className="text-[9px] text-slate-500 italic">{t('inv_no_expiry')}</p>}
                     </div>
                  </div>
               </div>

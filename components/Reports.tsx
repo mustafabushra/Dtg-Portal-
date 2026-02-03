@@ -5,16 +5,19 @@ import {
   BarChart, Bar
 } from 'recharts';
 import { Download, Calendar, Filter, ArrowUpRight, ArrowDownRight, TrendingUp, DollarSign, Wallet } from 'lucide-react';
+import { useLanguage } from '../contexts/LanguageContext';
 
 interface ReportsProps {
   data: any;
 }
 
 const Reports: React.FC<ReportsProps> = ({ data }) => {
+  const { t } = useLanguage();
+
   const inventoryStats = [
-    { name: 'المخزون', count: data.inventory.length },
-    { name: 'الأصول', count: data.assets.length },
-    { name: 'الموظفين', count: data.staff.length }
+    { name: t('rep_inv'), count: data.inventory.length },
+    { name: t('rep_assets'), count: data.assets.length },
+    { name: t('rep_staff'), count: data.staff.length }
   ];
 
   const treasuryIn = data.treasuryTransactions.filter((t: any) => t.type === 'IN').reduce((a: number, b: any) => a + b.amount, 0);
@@ -22,40 +25,72 @@ const Reports: React.FC<ReportsProps> = ({ data }) => {
   const totalPayroll = data.staff.reduce((a: number, s: any) => a + (s.totalMonthlyEarnings || 0), 0);
 
   const financialData = [
-    { name: 'الوارد', amount: treasuryIn },
-    { name: 'المنصرف', amount: treasuryOut },
-    { name: 'الرواتب', amount: totalPayroll }
+    { name: t('rep_in'), amount: treasuryIn },
+    { name: t('rep_out'), amount: treasuryOut },
+    { name: t('rep_payroll'), amount: totalPayroll }
   ];
+
+  const handleExportReport = () => {
+    const csvContent = [
+      ["Metric", "Value"],
+      [t('rep_inv'), data.inventory.length],
+      [t('rep_assets'), data.assets.length],
+      [t('rep_staff'), data.staff.length],
+      [t('rep_in'), treasuryIn],
+      [t('rep_out'), treasuryOut],
+      [t('rep_payroll'), totalPayroll],
+      ["Net Balance", treasuryIn - treasuryOut - totalPayroll]
+    ].map(e => e.join(",")).join("\n");
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `financial_report_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handleAnalyze = () => {
+    window.print();
+  };
 
   return (
     <div className="space-y-8 animate-in fade-in duration-700">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-black text-slate-900">التقارير والتحليلات المباشرة</h2>
-          <p className="text-slate-500 text-sm font-bold">تحليل ذكي يعتمد على البيانات المسجلة في النظام.</p>
+          <h2 className="text-2xl font-black text-slate-900">{t('rep_title')}</h2>
+          <p className="text-slate-500 text-sm font-bold">{t('rep_subtitle')}</p>
         </div>
         <div className="flex items-center gap-2">
-          <button className="flex items-center gap-2 px-6 py-3 bg-white border border-slate-200 rounded-2xl text-xs font-black text-slate-600 hover:bg-slate-50">
+          <button 
+            onClick={handleAnalyze}
+            className="flex items-center gap-2 px-6 py-3 bg-white border border-slate-200 rounded-2xl text-xs font-black text-slate-600 hover:bg-slate-50 transition-all active:scale-95"
+          >
             <Calendar className="w-4 h-4" />
-            تحليل حيوي
+            {t('rep_btn_analyze')} (PDF/Print)
           </button>
-          <button className="flex items-center gap-2 px-6 py-3 bg-slate-900 text-white rounded-2xl text-xs font-black hover:bg-amber-500 hover:text-slate-900 transition-all shadow-xl">
+          <button 
+            onClick={handleExportReport}
+            className="flex items-center gap-2 px-6 py-3 bg-slate-900 text-white rounded-2xl text-xs font-black hover:bg-amber-500 hover:text-slate-900 transition-all shadow-xl active:scale-95"
+          >
             <Download className="w-4 h-4" />
-            تصدير تقارير PDF
+            {t('rep_btn_export')}
           </button>
         </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <ReportMetricCard title="إجمالي حركة الخزنة (وارد)" value={`${treasuryIn.toLocaleString()} ر.س`} trend="+ الحقيقي" up={true} icon={TrendingUp} />
-        <ReportMetricCard title="إجمالي الالتزامات (صرف/رواتب)" value={`${(treasuryOut + totalPayroll).toLocaleString()} ر.س`} trend="مؤكد" up={false} icon={DollarSign} />
-        <ReportMetricCard title="رصيد السيولة الحالي" value={`${(treasuryIn - treasuryOut - totalPayroll).toLocaleString()} ر.س`} trend="دقيق" up={true} icon={Wallet} />
+        <ReportMetricCard title={t('rep_metric_treasury')} value={`${treasuryIn.toLocaleString()} ${t('currency')}`} trend="+" up={true} icon={TrendingUp} />
+        <ReportMetricCard title={t('rep_metric_liability')} value={`${(treasuryOut + totalPayroll).toLocaleString()} ${t('currency')}`} trend="-" up={false} icon={DollarSign} />
+        <ReportMetricCard title={t('rep_metric_balance')} value={`${(treasuryIn - treasuryOut - totalPayroll).toLocaleString()} ${t('currency')}`} trend="=" up={true} icon={Wallet} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-200">
           <h3 className="text-lg font-black mb-6 flex items-center justify-between text-slate-900">
-            توزيع الأصول والبيانات
+            {t('rep_dist_assets')}
             <Filter className="w-4 h-4 text-slate-300 cursor-pointer" />
           </h3>
           <div className="h-[300px]">
@@ -79,9 +114,9 @@ const Reports: React.FC<ReportsProps> = ({ data }) => {
 
         <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-200">
           <h3 className="text-lg font-black mb-6 flex items-center justify-between text-slate-900">
-            المؤشرات المالية (ر.س)
+            {t('rep_financial_ind')}
             <div className="flex gap-2">
-               <span className="flex items-center gap-1 text-[10px] font-black text-slate-400 uppercase tracking-widest"><span className="w-2 h-2 rounded-full bg-slate-900"></span> التحليل الفعلي</span>
+               <span className="flex items-center gap-1 text-[10px] font-black text-slate-400 uppercase tracking-widest"><span className="w-2 h-2 rounded-full bg-slate-900"></span> Live</span>
             </div>
           </h3>
           <div className="h-[300px]">

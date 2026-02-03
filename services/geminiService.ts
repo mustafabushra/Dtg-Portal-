@@ -1,15 +1,18 @@
 
 import { GoogleGenAI } from "@google/genai";
 
-// يتم ضبط هذه القيمة إلى true عند الرفع على Netlify
+// في Firebase Hosting، سنستخدم Rewrite لتوجيه /api/gemini إلى Cloud Function
 const IS_PRODUCTION = window.location.hostname !== 'localhost';
-const NETLIFY_ENDPOINT = "/.netlify/functions/gemini";
+const API_ENDPOINT = "/api/gemini";
 
 export const getCafeInsights = async (data: any) => {
   if (IS_PRODUCTION) {
     try {
-      const response = await fetch(NETLIFY_ENDPOINT, {
+      const response = await fetch(API_ENDPOINT, {
         method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify({ 
           prompt: "قدم 3 توصيات تنفيذية قصيرة جداً لزيادة الربح أو تقليل الهدر باللغة العربية.",
           context: {
@@ -19,10 +22,12 @@ export const getCafeInsights = async (data: any) => {
           }
         })
       });
+      if (!response.ok) throw new Error('Network response was not ok');
       const result = await response.json();
       return result.text;
     } catch (e) {
-      return "خطأ في الاتصال بسيرفر التحليل.";
+      console.error(e);
+      return "خطأ في الاتصال بسيرفر التحليل (Firebase Function).";
     }
   }
 
@@ -44,14 +49,19 @@ export const getCafeInsights = async (data: any) => {
 export const chatWithAI = async (query: string, context: any) => {
   if (IS_PRODUCTION) {
     try {
-      const response = await fetch(NETLIFY_ENDPOINT, {
+      const response = await fetch(API_ENDPOINT, {
         method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify({ prompt: query, context })
       });
+      if (!response.ok) throw new Error('Network response was not ok');
       const result = await response.json();
       return result.text;
     } catch (e) {
-      return "عذراً، المساعد غير متاح حالياً.";
+      console.error(e);
+      return "عذراً، المساعد غير متاح حالياً (Firebase Error).";
     }
   }
 

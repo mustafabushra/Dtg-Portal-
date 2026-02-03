@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { Globe, Plus, Calendar, CreditCard, RefreshCw, AlertCircle, Trash2, X, Wifi, ShoppingCart, Smartphone, Terminal, Briefcase } from 'lucide-react';
 import { ServiceSubscription } from '../types';
+import { useLanguage } from '../contexts/LanguageContext';
 
 interface ServiceSubscriptionsProps {
   subscriptions: ServiceSubscription[];
@@ -12,6 +13,7 @@ interface ServiceSubscriptionsProps {
 }
 
 const ServiceSubscriptions: React.FC<ServiceSubscriptionsProps> = ({ subscriptions, onAdd, onUpdate, onDelete, billingThreshold }) => {
+  const { t } = useLanguage();
   const [showModal, setShowModal] = useState(false);
 
   const getDaysUntil = (date: string) => {
@@ -31,7 +33,13 @@ const ServiceSubscriptions: React.FC<ServiceSubscriptionsProps> = ({ subscriptio
       ...sub,
       nextBillingDate: currentDate.toISOString().split('T')[0]
     });
-    alert(`تم تجديد ${sub.serviceName} بنجاح. الموعد القادم: ${currentDate.toLocaleDateString('ar-SA')}`);
+    // Assuming simple alert is fine or use UI notification
+  };
+
+  const handleDelete = (sub: ServiceSubscription) => {
+    if (window.confirm(t('confirm_delete'))) {
+      onDelete(sub.id);
+    }
   };
 
   const getCategoryIcon = (category: string) => {
@@ -67,11 +75,11 @@ const ServiceSubscriptions: React.FC<ServiceSubscriptionsProps> = ({ subscriptio
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-black text-slate-900">اشتراكات الخدمات والمنصات</h2>
-          <p className="text-slate-500 text-sm">تتبع تجديد فودكس، الإنترنت، والأنظمة التقنية.</p>
+          <h2 className="text-2xl font-black text-slate-900">{t('sub_title')}</h2>
+          <p className="text-slate-500 text-sm">{t('sub_desc')}</p>
         </div>
         <button onClick={() => setShowModal(true)} className="flex items-center gap-2 bg-slate-900 text-white px-6 py-3 rounded-2xl font-black shadow-xl hover:bg-amber-500 hover:text-slate-900 transition-all active:scale-95">
-          <Plus className="w-5 h-5" /> إضافة اشتراك منصة
+          <Plus className="w-5 h-5" /> {t('sub_add')}
         </button>
       </div>
 
@@ -91,9 +99,9 @@ const ServiceSubscriptions: React.FC<ServiceSubscriptionsProps> = ({ subscriptio
                    <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${
                      isOverdue ? 'bg-red-100 text-red-700' : isUrgent ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'
                    }`}>
-                     {isOverdue ? 'متأخر' : isUrgent ? 'استحقاق قريب' : 'نشط'}
+                     {isOverdue ? t('sub_overdue') : isUrgent ? t('sub_urgent') : t('sub_active')}
                    </span>
-                   <button onClick={() => onDelete(sub.id)} className="p-2 text-slate-300 hover:text-red-500 transition-colors"><Trash2 className="w-4 h-4" /></button>
+                   <button onClick={() => handleDelete(sub)} className="p-2 text-slate-300 hover:text-red-500 transition-colors"><Trash2 className="w-4 h-4" /></button>
                 </div>
               </div>
 
@@ -104,15 +112,15 @@ const ServiceSubscriptions: React.FC<ServiceSubscriptionsProps> = ({ subscriptio
 
               <div className="space-y-3 mb-6">
                 <div className="flex items-center justify-between p-3.5 bg-slate-50 rounded-2xl border border-slate-100">
-                  <span className="text-xs font-bold text-slate-500">التكلفة ({sub.billingCycle})</span>
-                  <span className="text-sm font-black text-slate-900">{sub.cost} ر.س</span>
+                  <span className="text-xs font-bold text-slate-500">{t('sub_label_cost')} ({sub.billingCycle})</span>
+                  <span className="text-sm font-black text-slate-900">{sub.cost} {t('currency')}</span>
                 </div>
                 <div className="flex items-center justify-between p-3.5 bg-slate-50 rounded-2xl border border-slate-100">
-                  <span className="text-xs font-bold text-slate-500">التجديد القادم</span>
-                  <div className="text-right">
+                  <span className="text-xs font-bold text-slate-500">{t('sub_label_date')}</span>
+                  <div className="text-end">
                     <p className="text-sm font-black text-slate-900">{sub.nextBillingDate}</p>
                     <p className={`text-[10px] font-black mt-0.5 ${isOverdue ? 'text-red-500' : daysLeft <= billingThreshold ? 'text-blue-500' : 'text-green-600'}`}>
-                      {isOverdue ? `منتهي` : `متبقي ${daysLeft} يوم`}
+                      {isOverdue ? t('sub_overdue') : `${daysLeft} ${t('comp_days')}`}
                     </p>
                   </div>
                 </div>
@@ -122,7 +130,7 @@ const ServiceSubscriptions: React.FC<ServiceSubscriptionsProps> = ({ subscriptio
                 onClick={() => renewService(sub)}
                 className="w-full py-3 bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-amber-500 hover:text-slate-900 transition-all shadow-lg active:scale-95"
               >
-                <RefreshCw className="w-4 h-4" /> تجديد الدفعة وتحديث التاريخ
+                <RefreshCw className="w-4 h-4" /> {t('sub_renew_btn')}
               </button>
             </div>
           );
@@ -134,13 +142,12 @@ const ServiceSubscriptions: React.FC<ServiceSubscriptionsProps> = ({ subscriptio
         <div className="flex items-start gap-5 relative z-10">
           <div className="bg-amber-500 p-4 rounded-2xl shadow-lg shadow-amber-500/20"><AlertCircle className="w-6 h-6 text-slate-900" /></div>
           <div>
-            <h4 className="text-xl font-black">إجمالي ميزانية التقنية والمنصات</h4>
-            <p className="text-slate-400 text-sm mt-1 font-medium">حساب تراكمي شهري لجميع الخدمات السحابية والبرمجية.</p>
+            <h4 className="text-xl font-black">{t('sub_total_budget')}</h4>
+            <p className="text-slate-400 text-sm mt-1 font-medium">{t('sub_monthly_est')}</p>
           </div>
         </div>
-        <div className="text-center md:text-left relative z-10">
-           <p className="text-4xl font-black text-amber-500">{totalMonthlyCost.toLocaleString()} ر.س</p>
-           <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mt-2">شهرياً (تقديري)</p>
+        <div className="text-center md:text-start relative z-10">
+           <p className="text-4xl font-black text-amber-500">{totalMonthlyCost.toLocaleString()} <span className="text-xl">{t('currency')}</span></p>
         </div>
       </div>
 
@@ -148,50 +155,50 @@ const ServiceSubscriptions: React.FC<ServiceSubscriptionsProps> = ({ subscriptio
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
           <div className="bg-white rounded-[2.5rem] w-full max-w-lg shadow-2xl animate-in zoom-in-95 duration-200">
             <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-              <h3 className="text-xl font-black text-slate-900">إضافة اشتراك منصة جديدة</h3>
+              <h3 className="text-xl font-black text-slate-900">{t('sub_modal_title')}</h3>
               <button onClick={() => setShowModal(false)} className="p-2 hover:bg-white rounded-xl text-slate-400"><X className="w-6 h-6" /></button>
             </div>
             <form onSubmit={handleAddSubmit} className="p-8 space-y-5">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <label className="text-xs font-black text-slate-500 mr-2">اسم الخدمة</label>
-                  <input name="serviceName" required placeholder="مثلاً: فودكس كاشير" className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold" />
+                  <label className="text-xs font-black text-slate-500">{t('sub_label_name')}</label>
+                  <input name="serviceName" required className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold" />
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-xs font-black text-slate-500 mr-2">المزود</label>
-                  <input name="provider" required placeholder="مثلاً: Foodics" className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold" />
+                  <label className="text-xs font-black text-slate-500">{t('sub_label_provider')}</label>
+                  <input name="provider" required className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold" />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <label className="text-xs font-black text-slate-500 mr-2">الفئة</label>
+                  <label className="text-xs font-black text-slate-500">{t('sub_label_category')}</label>
                   <select name="category" className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold">
-                    <option value="كاشير">كاشير</option>
-                    <option value="إنترنت">إنترنت</option>
-                    <option value="ولاء">ولاء</option>
-                    <option value="توصيل">توصيل</option>
-                    <option value="برمجيات">برمجيات أخرى</option>
+                    <option value="كاشير">{t('sub_category_pos')}</option>
+                    <option value="إنترنت">{t('sub_category_internet')}</option>
+                    <option value="ولاء">{t('sub_category_loyalty')}</option>
+                    <option value="توصيل">{t('sub_category_delivery')}</option>
+                    <option value="برمجيات">{t('sub_category_software')}</option>
                   </select>
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-xs font-black text-slate-500 mr-2">دورة الفوترة</label>
+                  <label className="text-xs font-black text-slate-500">{t('sub_label_cycle')}</label>
                   <select name="billingCycle" className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold">
-                    <option value="شهري">شهري</option>
-                    <option value="سنوي">سنوي</option>
+                    <option value="شهري">Monthly</option>
+                    <option value="سنوي">Yearly</option>
                   </select>
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <label className="text-xs font-black text-slate-500 mr-2">التكلفة (ر.س)</label>
+                  <label className="text-xs font-black text-slate-500">{t('sub_label_cost')}</label>
                   <input name="cost" type="number" required className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold" />
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-xs font-black text-slate-500 mr-2">موعد التجديد القادم</label>
+                  <label className="text-xs font-black text-slate-500">{t('sub_label_date')}</label>
                   <input name="nextBillingDate" type="date" required className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold" />
                 </div>
               </div>
-              <button type="submit" className="w-full py-4 bg-slate-900 text-white rounded-[1.5rem] font-black text-lg hover:bg-amber-500 hover:text-slate-900 transition-all shadow-xl">تفعيل التتبع السحابي</button>
+              <button type="submit" className="w-full py-4 bg-slate-900 text-white rounded-[1.5rem] font-black text-lg hover:bg-amber-500 hover:text-slate-900 transition-all shadow-xl">{t('sub_btn_save')}</button>
             </form>
           </div>
         </div>

@@ -1,7 +1,8 @@
 
 import React, { useState } from 'react';
-import { Home, User, Phone, Calendar, DollarSign, Plus, Search, Trash2, Edit, X, CheckCircle2, AlertTriangle, Clock, ArrowLeftRight, Building2, BellRing } from 'lucide-react';
+import { Home, User, Phone, Calendar, DollarSign, Plus, Search, Trash2, Edit, X, CheckCircle2, AlertTriangle, Clock, ArrowLeftRight, Building2, BellRing, MoreVertical } from 'lucide-react';
 import { RentalUnit, RentalPayment } from '../types';
+import { useLanguage } from '../contexts/LanguageContext';
 
 interface RentalsManagerProps {
   rentals: RentalUnit[];
@@ -11,6 +12,7 @@ interface RentalsManagerProps {
 }
 
 const RentalsManager: React.FC<RentalsManagerProps> = ({ rentals, onAdd, onUpdate, onDelete }) => {
+  const { t, dir } = useLanguage();
   const [showModal, setShowModal] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [selectedUnit, setSelectedUnit] = useState<RentalUnit | null>(null);
@@ -41,48 +43,25 @@ const RentalsManager: React.FC<RentalsManagerProps> = ({ rentals, onAdd, onUpdat
       .map(p => ({ ...p, unitNumber: r.unitNumber, tenantName: r.tenantName }))
   );
 
-  // دالة لتوليد جدول الدفعات تلقائياً بتقسيم المبلغ السنوي
-  // المنطق: قيمة الدفعة = المبلغ السنوي / (12 / مدة الدورة بالأشهر)
   const generatePaymentSchedule = (start: string, end: string, cycle: string, totalAnnualAmount: number): RentalPayment[] => {
     const payments: RentalPayment[] = [];
     let currentDate = new Date(start);
     const endDate = new Date(end);
     
-    let monthsToAdd = 1; // الافتراضي شهر واحد
-    let paymentsPerYear = 12; // الافتراضي 12 دفعة في السنة
+    let monthsToAdd = 1;
+    let paymentsPerYear = 12;
 
-    // تحديد عدد الأشهر وعدد الدفعات في السنة بناءً على الدورة
     switch (cycle) {
-      case 'monthly': // شهري
-        monthsToAdd = 1;
-        paymentsPerYear = 12;
-        break;
-      case 'quarterly': // كل 3 أشهر
-        monthsToAdd = 3;
-        paymentsPerYear = 4;
-        break;
-      case 'triannual': // كل 4 أشهر
-        monthsToAdd = 4;
-        paymentsPerYear = 3;
-        break;
-      case 'biannual': // كل 6 أشهر (نصف سنوي)
-        monthsToAdd = 6;
-        paymentsPerYear = 2;
-        break;
-      case 'yearly': // سنوي
-        monthsToAdd = 12;
-        paymentsPerYear = 1;
-        break;
-      default:
-        monthsToAdd = 1;
-        paymentsPerYear = 12;
+      case 'monthly': monthsToAdd = 1; paymentsPerYear = 12; break;
+      case 'quarterly': monthsToAdd = 3; paymentsPerYear = 4; break;
+      case 'triannual': monthsToAdd = 4; paymentsPerYear = 3; break;
+      case 'biannual': monthsToAdd = 6; paymentsPerYear = 2; break;
+      case 'yearly': monthsToAdd = 12; paymentsPerYear = 1; break;
+      default: monthsToAdd = 1; paymentsPerYear = 12;
     }
 
-    // حساب مبلغ الدفعة الواحدة (المبلغ السنوي ÷ عدد الدفعات)
-    // نستخدم Math.floor أو Math.round لتقريب الكسور، هنا سنستخدم round لأقرب عدد صحيح
     const amountPerPayment = Math.round(totalAnnualAmount / paymentsPerYear);
 
-    // حلقة التكرار لتوليد التواريخ
     while (currentDate <= endDate) {
       payments.push({
         id: Math.random().toString(36).substr(2, 9),
@@ -90,9 +69,6 @@ const RentalsManager: React.FC<RentalsManagerProps> = ({ rentals, onAdd, onUpdat
         dueDate: currentDate.toISOString().split('T')[0],
         status: 'pending'
       });
-      
-      // إضافة الأشهر للتاريخ الحالي (منطق عقاري: نفس اليوم من الشهر القادم)
-      // setMonth يتعامل تلقائياً مع السنة الجديدة
       currentDate.setMonth(currentDate.getMonth() + monthsToAdd);
     }
     return payments;
@@ -103,28 +79,18 @@ const RentalsManager: React.FC<RentalsManagerProps> = ({ rentals, onAdd, onUpdat
     const formData = new FormData(e.currentTarget);
     const id = editUnit ? editUnit.id : Math.random().toString(36).substr(2, 9);
     
-    const rentAmount = Number(formData.get('rentAmount')); // هذا هو المبلغ السنوي الآن
+    const rentAmount = Number(formData.get('rentAmount'));
     const billingCycle = formData.get('billingCycle') as any;
     const startDate = formData.get('startDate') as string;
     const endDate = formData.get('endDate') as string;
 
-    // 1. دائماً قم بتوليد الجدول الجديد بناءً على المدخلات الحالية (سواء جديد أو تعديل) لتحديث التواريخ والمبالغ
     let generatedPayments = generatePaymentSchedule(startDate, endDate, billingCycle, rentAmount);
 
-    // 2. في حالة التعديل، حاول الحفاظ على حالة "مدفوع" للدفعات التي لها نفس تاريخ الاستحقاق
     if (editUnit && editUnit.payments.length > 0) {
         generatedPayments = generatedPayments.map(newPayment => {
-            // نبحث عن دفعة قديمة بنفس تاريخ الاستحقاق
             const matchingOldPayment = editUnit.payments.find(p => p.dueDate === newPayment.dueDate);
-            
-            // إذا وجدنا دفعة قديمة وكانت "مدفوعة"، ننقل حالتها للجدول الجديد
             if (matchingOldPayment && matchingOldPayment.status === 'paid') {
-                return {
-                    ...newPayment,
-                    status: 'paid',
-                    paidDate: matchingOldPayment.paidDate,
-                    note: matchingOldPayment.note // الاحتفاظ بالملاحظات أيضاً
-                };
+                return { ...newPayment, status: 'paid', paidDate: matchingOldPayment.paidDate, note: matchingOldPayment.note };
             }
             return newPayment;
         });
@@ -136,17 +102,23 @@ const RentalsManager: React.FC<RentalsManagerProps> = ({ rentals, onAdd, onUpdat
       type: formData.get('type') as any,
       tenantName: formData.get('tenantName') as string,
       tenantPhone: formData.get('tenantPhone') as string,
-      rentAmount, // نحفظ المبلغ السنوي هنا
+      rentAmount,
       billingCycle,
       startDate,
       endDate,
       status: 'occupied',
-      payments: generatedPayments, // نستخدم الجدول المحدث
+      payments: generatedPayments,
     };
 
     editUnit ? onUpdate(newUnit) : onAdd(newUnit);
     setShowModal(false);
     setEditUnit(null);
+  };
+
+  const handleDelete = (unit: RentalUnit) => {
+    if (window.confirm(t('confirm_delete'))) {
+      onDelete(unit.id);
+    }
   };
 
   const handleAddPayment = (e: React.FormEvent<HTMLFormElement>) => {
@@ -164,7 +136,6 @@ const RentalsManager: React.FC<RentalsManagerProps> = ({ rentals, onAdd, onUpdat
       note: formData.get('note') as string,
     };
     
-    // إضافة تاريخ الدفع فقط إذا كانت الحالة مدفوعة
     if (isPaid) {
       newPayment.paidDate = new Date().toISOString().split('T')[0];
     }
@@ -182,21 +153,13 @@ const RentalsManager: React.FC<RentalsManagerProps> = ({ rentals, onAdd, onUpdat
       if (p.id === paymentId) {
         const isCurrentlyPaid = p.status === 'paid';
         const newStatus = isCurrentlyPaid ? 'pending' : 'paid';
-        
-        // إنشاء نسخة وتحديث الحالة
-        const updatedPayment: RentalPayment = { 
-          ...p, 
-          status: newStatus 
-        };
+        const updatedPayment: RentalPayment = { ...p, status: newStatus };
         
         if (isCurrentlyPaid) {
-          // إذا كانت مدفوعة وصارت معلقة، نحذف تاريخ الدفع
           delete (updatedPayment as any).paidDate;
         } else {
-          // إذا كانت معلقة وصارت مدفوعة، نضيف تاريخ اليوم
           updatedPayment.paidDate = new Date().toISOString().split('T')[0];
         }
-        
         return updatedPayment;
       }
       return p;
@@ -211,7 +174,7 @@ const RentalsManager: React.FC<RentalsManagerProps> = ({ rentals, onAdd, onUpdat
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="bg-slate-900 text-white p-8 rounded-[2.5rem] shadow-xl relative overflow-hidden">
           <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/10 rounded-full blur-3xl"></div>
-          <p className="text-amber-500 text-[10px] font-black uppercase tracking-widest mb-2">إجمالي التحصيل الفعلي</p>
+          <p className="text-amber-500 text-[10px] font-black uppercase tracking-widest mb-2">{t('rental_status')}</p>
           <h3 className="text-3xl font-black">{totalRevenue.toLocaleString()} <span className="text-sm">ر.س</span></h3>
         </div>
         <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm">
@@ -224,14 +187,13 @@ const RentalsManager: React.FC<RentalsManagerProps> = ({ rentals, onAdd, onUpdat
         </div>
       </div>
 
-      {/* Alarms Section Improved */}
+      {/* Alarms Section */}
       {(overduePayments.length > 0 || upcomingPayments.length > 0) && (
         <div className="bg-white border border-slate-200 rounded-[2.5rem] p-8 shadow-sm space-y-6">
           <h3 className="text-lg font-black text-slate-900 flex items-center gap-3">
             <BellRing className="w-6 h-6 text-orange-500 animate-bounce" /> تذكيرات الإيجارات والتحصيل العاجلة
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Overdue Items (Red) */}
             {overduePayments.map(p => (
               <div key={p.id} className="bg-red-50 p-5 rounded-3xl border border-red-200 flex items-center justify-between shadow-sm relative overflow-hidden group hover:scale-[1.02] transition-transform">
                 <div className="absolute top-0 right-0 w-1 bg-red-500 h-full"></div>
@@ -249,7 +211,6 @@ const RentalsManager: React.FC<RentalsManagerProps> = ({ rentals, onAdd, onUpdat
               </div>
             ))}
             
-            {/* Upcoming Items (Orange) */}
             {upcomingPayments.map(p => {
               const days = getDaysUntil(p.dueDate);
               return (
@@ -277,33 +238,34 @@ const RentalsManager: React.FC<RentalsManagerProps> = ({ rentals, onAdd, onUpdat
       <div className="bg-white rounded-[2.5rem] shadow-sm border border-slate-200 overflow-hidden">
         <div className="p-8 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-6 bg-slate-50/30">
           <div className="flex-1 relative">
-            <Search className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <Search className={`absolute top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 ${dir === 'rtl' ? 'right-4' : 'left-4'}`} />
             <input 
               value={search} 
               onChange={(e) => setSearch(e.target.value)} 
               type="text" 
-              placeholder="ابحث برقم الوحدة أو اسم المستأجر..." 
-              className="w-full pr-12 pl-4 py-3.5 rounded-2xl border border-slate-200 focus:outline-none focus:ring-4 focus:ring-amber-500/10 text-sm font-bold" 
+              placeholder={t('rental_search_placeholder')} 
+              className={`w-full py-3.5 rounded-2xl border border-slate-200 focus:outline-none focus:ring-4 focus:ring-amber-500/10 text-sm font-bold ${dir === 'rtl' ? 'pr-12 pl-4' : 'pl-12 pr-4'}`}
             />
           </div>
           <button 
             onClick={() => { setEditUnit(null); setShowModal(true); }} 
             className="bg-slate-900 text-white px-8 py-3.5 rounded-2xl font-black hover:bg-amber-500 hover:text-slate-900 transition-all flex items-center justify-center gap-2 shadow-xl"
           >
-            <Plus className="w-5 h-5" /> إضافة وحدة/مستأجر
+            <Plus className="w-5 h-5" /> {t('rental_add_new')}
           </button>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-right">
+        {/* -------------------- DESKTOP VIEW (Table) -------------------- */}
+        <div className="hidden lg:block overflow-x-auto">
+          <table className="w-full text-start">
             <thead className="bg-slate-50 border-b border-slate-100">
               <tr>
-                <th className="px-8 py-5 text-[10px] font-black text-slate-500 uppercase tracking-widest">الوحدة</th>
-                <th className="px-8 py-5 text-[10px] font-black text-slate-500 uppercase tracking-widest">المستأجر</th>
-                <th className="px-8 py-5 text-[10px] font-black text-slate-500 uppercase tracking-widest">إجمالي العقد (سنوي)</th>
-                <th className="px-8 py-5 text-[10px] font-black text-slate-500 uppercase tracking-widest">تاريخ النهاية</th>
-                <th className="px-8 py-5 text-[10px] font-black text-slate-500 uppercase tracking-widest">الحالة المالية</th>
-                <th className="px-8 py-5 text-[10px] font-black text-slate-500 uppercase tracking-widest text-left">إجراءات</th>
+                <th className="px-8 py-5 text-[10px] font-black text-slate-500 uppercase tracking-widest text-start">{t('rental_unit')}</th>
+                <th className="px-8 py-5 text-[10px] font-black text-slate-500 uppercase tracking-widest text-start">{t('rental_tenant')}</th>
+                <th className="px-8 py-5 text-[10px] font-black text-slate-500 uppercase tracking-widest text-start">{t('rental_contract_total')}</th>
+                <th className="px-8 py-5 text-[10px] font-black text-slate-500 uppercase tracking-widest text-start">{t('rental_end_date')}</th>
+                <th className="px-8 py-5 text-[10px] font-black text-slate-500 uppercase tracking-widest text-start">{t('rental_status')}</th>
+                <th className="px-8 py-5 text-[10px] font-black text-slate-500 uppercase tracking-widest text-end">{t('rental_actions')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -331,33 +293,115 @@ const RentalsManager: React.FC<RentalsManagerProps> = ({ rentals, onAdd, onUpdat
                     <td className="px-8 py-5">
                       {pendingCount > 0 ? (
                         <span className="px-3 py-1 bg-red-50 text-red-600 rounded-full text-[10px] font-black border border-red-100">
-                          {pendingCount} دفعات معلقة
+                          {pendingCount} {t('rental_pending_payments')}
                         </span>
                       ) : (
                         <span className="px-3 py-1 bg-green-50 text-green-600 rounded-full text-[10px] font-black border border-green-100">
-                          منتظم
+                          {t('rental_regular')}
                         </span>
                       )}
                     </td>
-                    <td className="px-8 py-5 text-left flex items-center justify-end gap-2">
-                      <button 
-                        onClick={() => { setSelectedUnit(unit); setShowPaymentModal(true); }}
-                        className="bg-amber-500 text-slate-900 px-4 py-2 rounded-xl text-[10px] font-black hover:bg-amber-400 transition-all"
-                      >
-                        إدارة الدفعات
-                      </button>
-                      <button onClick={() => { setEditUnit(unit); setShowModal(true); }} className="p-2 text-slate-300 hover:text-blue-500 transition-colors">
-                        <Edit className="w-4 h-4" />
-                      </button>
-                      <button onClick={() => onDelete(unit.id)} className="p-2 text-slate-300 hover:text-red-500 transition-colors">
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                    <td className="px-8 py-5">
+                      <div className="flex items-center justify-end gap-2">
+                        <button 
+                          onClick={() => { setSelectedUnit(unit); setShowPaymentModal(true); }}
+                          className="bg-amber-500 text-slate-900 px-4 py-2 rounded-xl text-[10px] font-black hover:bg-amber-400 transition-all"
+                        >
+                          {t('rental_manage_payments')}
+                        </button>
+                        <button onClick={() => { setEditUnit(unit); setShowModal(true); }} className="p-2 text-slate-300 hover:text-blue-500 transition-colors">
+                          <Edit className="w-4 h-4" />
+                        </button>
+                        <button onClick={() => handleDelete(unit)} className="p-2 text-slate-300 hover:text-red-500 transition-colors">
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 );
               })}
             </tbody>
           </table>
+        </div>
+
+        {/* -------------------- MOBILE VIEW (Cards) -------------------- */}
+        <div className="lg:hidden p-4 space-y-4 bg-slate-50/50">
+          {filteredRentals.map(unit => {
+            const pendingCount = unit.payments.filter(p => p.status === 'pending').length;
+            return (
+              <div key={unit.id} className="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm relative overflow-hidden group hover:border-amber-200 transition-all">
+                {/* Header */}
+                <div className="flex justify-between items-start mb-4 border-b border-slate-100 pb-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-2xl bg-slate-100 flex items-center justify-center border border-slate-200 text-slate-500 font-black text-lg">
+                      <Building2 className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <p className="text-lg font-black text-slate-900">{unit.unitNumber}</p>
+                      <p className="text-[10px] text-amber-600 font-bold uppercase tracking-wider bg-amber-50 px-2 py-0.5 rounded-md inline-block">{unit.type}</p>
+                    </div>
+                  </div>
+                  <div>
+                    {pendingCount > 0 ? (
+                      <span className="flex items-center gap-1 px-3 py-1.5 bg-red-50 text-red-600 rounded-xl text-[10px] font-black border border-red-100">
+                        <AlertTriangle className="w-3 h-3" /> {pendingCount} {t('rental_pending_payments')}
+                      </span>
+                    ) : (
+                      <span className="flex items-center gap-1 px-3 py-1.5 bg-green-50 text-green-600 rounded-xl text-[10px] font-black border border-green-100">
+                        <CheckCircle2 className="w-3 h-3" /> {t('rental_regular')}
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Body */}
+                <div className="space-y-3 mb-6">
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs font-bold text-slate-400">{t('rental_tenant')}</span>
+                    <div className="text-end">
+                      <p className="text-sm font-black text-slate-900">{unit.tenantName}</p>
+                      <p className="text-[10px] text-slate-400 dir-ltr">{unit.tenantPhone}</p>
+                    </div>
+                  </div>
+                  <div className="flex justify-between items-center p-3 bg-slate-50 rounded-xl border border-slate-100">
+                    <span className="text-xs font-bold text-slate-500">{t('rental_contract_value')}</span>
+                    <span className="text-sm font-black text-emerald-600">{unit.rentAmount.toLocaleString()} ر.س</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs font-bold text-slate-400">{t('rental_end_date')}</span>
+                    <span className="text-xs font-black text-slate-700 bg-slate-100 px-2 py-1 rounded-lg">{unit.endDate}</span>
+                  </div>
+                </div>
+
+                {/* Footer / Actions */}
+                <div className="flex items-center gap-2 pt-2">
+                  <button 
+                    onClick={() => { setSelectedUnit(unit); setShowPaymentModal(true); }}
+                    className="flex-1 py-3 bg-slate-900 text-white rounded-xl text-xs font-black hover:bg-amber-500 hover:text-slate-900 transition-all flex items-center justify-center gap-2 shadow-lg active:scale-95"
+                  >
+                    <DollarSign className="w-4 h-4" /> {t('rental_manage_payments')}
+                  </button>
+                  <button 
+                    onClick={() => { setEditUnit(unit); setShowModal(true); }} 
+                    className="p-3 bg-slate-50 text-slate-400 rounded-xl border border-slate-200 hover:bg-white hover:border-blue-200 hover:text-blue-500 transition-all active:scale-95"
+                  >
+                    <Edit className="w-4 h-4" />
+                  </button>
+                  <button 
+                    onClick={() => handleDelete(unit)} 
+                    className="p-3 bg-slate-50 text-slate-400 rounded-xl border border-slate-200 hover:bg-white hover:border-red-200 hover:text-red-500 transition-all active:scale-95"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+          {filteredRentals.length === 0 && (
+             <div className="text-center py-10 text-slate-400 font-bold text-sm">
+                لا توجد وحدات مطابقة للبحث.
+             </div>
+          )}
         </div>
       </div>
 

@@ -18,12 +18,15 @@ import TaskManager from './components/TaskManager';
 import DeploymentCenter from './components/DeploymentCenter';
 import CloudSetup from './components/CloudSetup'; 
 import { View, InventoryItem, Asset, Staff, Document, ServiceSubscription, AttendanceLog, TreasuryTransaction, RentalUnit, UserType, Task } from './types';
-import { Menu, WifiOff, ShieldAlert } from 'lucide-react';
+import { Menu, WifiOff, ShieldAlert, Globe } from 'lucide-react';
 import { getCafeInsights } from './services/geminiService';
 import { db, isConfigured } from './services/firebase'; 
 import { collection, onSnapshot, doc, setDoc, deleteDoc, updateDoc } from 'firebase/firestore';
+import { useLanguage } from './contexts/LanguageContext';
 
 const App: React.FC = () => {
+  const { t, dir, language, setLanguage } = useLanguage();
+
   if (!isConfigured) {
     return <CloudSetup />;
   }
@@ -59,7 +62,8 @@ const App: React.FC = () => {
     const subscribe = (colName: string, setter: React.Dispatch<React.SetStateAction<any[]>>) => {
       try {
         return onSnapshot(collection(db, colName), (snapshot) => {
-          const data = snapshot.docs.map(doc => doc.data());
+          // FIX: Ensure ID is explicitly mapped from doc.id to prevent delete errors
+          const data = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
           setter(data);
           setDbStatus('connected');
         }, (error) => {
@@ -103,52 +107,56 @@ const App: React.FC = () => {
     };
   }, []);
 
-  // دالة متقدمة لتنظيف البيانات من undefined بشكل متكرر
+  useEffect(() => {
+    if (currentStaffUser && staff.length > 0) {
+      const updatedUser = staff.find(s => s.id === currentStaffUser.id);
+      if (updatedUser && JSON.stringify(updatedUser) !== JSON.stringify(currentStaffUser)) {
+        setCurrentStaffUser(updatedUser);
+      }
+    }
+  }, [staff, currentStaffUser]);
+
   const sanitizeData = (obj: any): any => {
     if (obj === null || obj === undefined) return null;
     if (typeof obj !== 'object') return obj;
-    
-    if (Array.isArray(obj)) {
-      return obj.map(sanitizeData);
-    }
-    
+    if (Array.isArray(obj)) return obj.map(sanitizeData);
     const newObj: any = {};
     Object.keys(obj).forEach(key => {
       const value = obj[key];
-      if (value !== undefined) {
-        newObj[key] = sanitizeData(value);
-      }
+      if (value !== undefined) newObj[key] = sanitizeData(value);
     });
     return newObj;
   };
 
   const saveDoc = async (colName: string, data: any) => {
     try {
-      // استخدام دالة التنظيف المتقدمة بدلاً من JSON.stringify
       const cleanData = sanitizeData(data);
-      // التأكد من عدم وجود undefined في المستوى الأول أيضاً (زيادة في الحرص)
-      if (cleanData) {
-         Object.keys(cleanData).forEach(key => cleanData[key] === undefined && delete cleanData[key]);
-      }
-      
+      if (cleanData) Object.keys(cleanData).forEach(key => cleanData[key] === undefined && delete cleanData[key]);
       await setDoc(doc(db, colName, data.id), cleanData);
     } catch (e: any) {
       console.error("Error saving doc:", e);
       if (e.code === 'permission-denied') {
-        alert("خطأ صلاحيات: قاعدة البيانات مقفلة. يرجى الذهاب إلى Firebase Console -> Firestore Database -> Rules وتغييرها إلى 'allow read, write: if true;'");
+        alert(t('permissionDenied'));
       } else {
-        alert(`حدث خطأ في الحفظ: ${e.message}`);
+        alert(`Error: ${e.message}`);
       }
     }
   };
 
   const removeDoc = async (colName: string, id: string) => {
+    if (!id) {
+        console.error(`Attempted to delete document from ${colName} with undefined ID`);
+        alert("خطأ: لا يمكن حذف عنصر بدون معرف (ID) صحيح. يرجى تحديث الصفحة والمحاولة مرة أخرى.");
+        return;
+    }
     try {
       await deleteDoc(doc(db, colName, id));
     } catch (e: any) {
       console.error("Error deleting doc:", e);
       if (e.code === 'permission-denied') {
-        alert("خطأ صلاحيات: لا تملك إذن الحذف. تحقق من قواعد Firebase.");
+        alert(t('permissionDenied'));
+      } else {
+        alert(`Error: ${e.message}`);
       }
     }
   };
@@ -170,7 +178,7 @@ const App: React.FC = () => {
 
   const handleLogin = (type: 'ADMIN' | 'STAFF', credentials: { cafeId: string, username: string, password?: string }) => {
     if (credentials.cafeId !== themeSettings.cafeAccountId) {
-      alert('رقم المؤسسة غير صحيح. يرجى مراجعة الإدارة.');
+      alert(t('loginErrorCafe'));
       return;
     }
 
@@ -179,7 +187,7 @@ const App: React.FC = () => {
         setCurrentUserType('ADMIN');
         setCurrentView('DASHBOARD');
       } else {
-        alert('بيانات دخول المدير غير صحيحة');
+        alert(t('loginErrorAdmin'));
       }
     } else {
       const user = staff.find(s => s.username === credentials.username);
@@ -192,7 +200,7 @@ const App: React.FC = () => {
           setCurrentView('EMPLOYEE_PORTAL');
         }
       } else {
-        alert('اسم المستخدم أو كلمة المرور غير صحيحة');
+        alert(t('loginErrorStaff'));
       }
     }
   };
@@ -234,6 +242,10 @@ const App: React.FC = () => {
     return <Login onLogin={handleLogin} staffList={staff} logoUrl={themeSettings.logoUrl} systemName={themeSettings.systemName} />;
   }
 
+  // Calculate Main Content Margin based on Sidebar Logic
+  // LTR: Margin Left 16rem (64) | RTL: Margin Right 16rem (64)
+  const mainContentMargin = dir === 'rtl' ? 'lg:mr-64' : 'lg:ml-64';
+
   return (
     <div className="min-h-screen flex bg-[#f8fafc] font-['Cairo'] text-slate-900 overflow-x-hidden">
       <style>{`
@@ -256,11 +268,10 @@ const App: React.FC = () => {
         systemName={themeSettings.systemName}
       />
       
-      {isSidebarOpen && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-40 lg:hidden" onClick={() => setIsSidebarOpen(false)}></div>
-      )}
-
-      <main className={`flex-1 transition-all duration-300 w-full lg:mr-64 p-4 md:p-10`}>
+      {/* Main Content Area */}
+      <main className={`flex-1 transition-all duration-300 w-full p-4 md:p-10 ${mainContentMargin}`}>
+        
+        {/* Header Bar */}
         <div className="mb-8 flex items-center justify-between bg-white px-8 py-5 rounded-[2.5rem] shadow-sm border border-slate-200">
           <div className="flex items-center gap-6">
             <button onClick={() => setIsSidebarOpen(true)} className="lg:hidden p-2 hover:bg-slate-100 rounded-xl transition-colors">
@@ -269,14 +280,31 @@ const App: React.FC = () => {
             <div className="hidden sm:flex items-center gap-2">
               <div className={`w-2.5 h-2.5 rounded-full ${dbStatus === 'connected' ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'}`}></div>
               <span className="text-[11px] font-black uppercase tracking-widest text-slate-500">
-                {dbStatus === 'connected' ? `Live Sync: ${themeSettings.cafeAccountId}` : 'غير متصل'}
+                {dbStatus === 'connected' ? `${t('liveSync')}: ${themeSettings.cafeAccountId}` : t('offline')}
               </span>
             </div>
           </div>
+          
           <div className="flex items-center gap-4">
-             <div className="text-left ml-4 text-right">
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{currentUserType === 'ADMIN' ? 'المدير' : 'موظف'}</p>
-                <p className="text-sm font-black text-slate-900">{currentUserType === 'ADMIN' ? 'المدير العام' : currentStaffUser?.name}</p>
+             {/* Global Language Switcher */}
+             <button 
+                onClick={() => setLanguage(language === 'ar' ? 'en' : 'ar')}
+                className="flex items-center gap-2 bg-slate-50 hover:bg-slate-100 px-3 py-2 rounded-xl transition-colors border border-slate-100"
+                title="Switch Language"
+             >
+                <Globe className="w-4 h-4 text-slate-500" />
+                <span className="text-[10px] font-black text-slate-700 uppercase">{language === 'ar' ? 'EN' : 'AR'}</span>
+             </button>
+
+             <div className="h-8 w-px bg-slate-100 mx-2 hidden sm:block"></div>
+
+             <div className="text-start hidden sm:block">
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                  {currentUserType === 'ADMIN' ? t('welcome_admin') : t('welcome_staff')}
+                </p>
+                <p className="text-sm font-black text-slate-900">
+                  {currentUserType === 'ADMIN' ? t('welcome_admin') : currentStaffUser?.name}
+                </p>
              </div>
              <img src={`https://api.dicebear.com/7.x/bottts/svg?seed=${currentUserType === 'ADMIN' ? 'admin' : currentStaffUser?.username}`} className="w-10 h-10 rounded-full bg-slate-100 p-1 border border-slate-200" alt="Avatar" />
           </div>
@@ -286,16 +314,9 @@ const App: React.FC = () => {
           <div className="mb-6 bg-red-50 border border-red-200 p-4 rounded-2xl flex items-center gap-3 text-red-700 animate-in fade-in">
             <ShieldAlert className="w-6 h-6" />
             <div>
-               <p className="text-sm font-black">خطأ في الصلاحيات (Permission Denied)</p>
-               <p className="text-xs mt-1">قاعدة البيانات مقفلة. اذهب إلى Firebase Console {'>'} Firestore {'>'} Rules واجعلها <code>allow read, write: if true;</code></p>
+               <p className="text-sm font-black">{t('permissionDenied')}</p>
+               <p className="text-xs mt-1">Check Firebase Console Rules.</p>
             </div>
-          </div>
-        )}
-
-        {dbStatus === 'offline' && (
-          <div className="mb-6 bg-red-50 border border-red-200 p-4 rounded-2xl flex items-center gap-3 text-red-700 animate-in fade-in">
-            <WifiOff className="w-5 h-5" />
-            <p className="text-sm font-bold">تنبيه: الاتصال بالسحابة غير مستقر. تأكد من إعدادات الإنترنت.</p>
           </div>
         )}
 
@@ -310,7 +331,8 @@ const App: React.FC = () => {
                  const t = tasks.find(x => x.id === id);
                  if (t) saveDoc('tasks', { ...t, status: 'completed' });
               }} 
-              onAttendance={(type) => updateStaffAttendance(currentStaffUser.id, type)} 
+              onAttendance={(type) => updateStaffAttendance(currentStaffUser.id, type)}
+              onUpdateStaff={(updated) => saveDoc('staff', updated)}
             />
           )}
 
@@ -401,9 +423,7 @@ const App: React.FC = () => {
           
           {currentView === 'SETTINGS' && (
             <Settings 
-              onReset={() => {
-                 // لا شيء هنا حالياً لأن الإعدادات ثابتة
-              }} 
+              onReset={() => {}} 
               cafeLocation={cafeLocation} 
               setCafeLocation={(loc) => saveDoc('settings', { id: 'location', ...loc })} 
               billingThreshold={billingThreshold} 

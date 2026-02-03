@@ -1,15 +1,48 @@
 
 import React from 'react';
-import { DollarSign, Calendar, CheckCircle2, User, Clock, ArrowLeftRight } from 'lucide-react';
+import { DollarSign, Calendar, CheckCircle2, User, Clock, ArrowLeftRight, Download } from 'lucide-react';
 import { Staff } from '../types';
+import { useLanguage } from '../contexts/LanguageContext';
 
 interface PayrollManagerProps {
   staff: Staff[];
 }
 
 const PayrollManager: React.FC<PayrollManagerProps> = ({ staff }) => {
+  const { t } = useLanguage(); 
   const totalPayroll = staff.reduce((acc, s) => acc + (s.totalMonthlyEarnings || 0), 0);
   const totalHours = staff.reduce((acc, s) => acc + (s.totalMonthlyHours || 0), 0);
+
+  const handleExportPayroll = () => {
+    if (staff.length === 0) {
+      alert("لا توجد بيانات لتصديرها.");
+      return;
+    }
+
+    const headers = ["Employee Name", "Role", "Hourly Rate", "Hours Worked", "Total Due", "Status"];
+    const rows = staff.map(s => [
+      `"${s.name}"`,
+      `"${s.role}"`,
+      s.hourlyRate,
+      Math.round(s.totalMonthlyHours || 0),
+      s.totalMonthlyEarnings || 0,
+      "Ready"
+    ]);
+
+    const csvContent = [
+      headers.join(","),
+      ...rows.map(r => r.join(","))
+    ].join("\n");
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `payroll_export_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
@@ -43,7 +76,13 @@ const PayrollManager: React.FC<PayrollManagerProps> = ({ staff }) => {
             <DollarSign className="w-6 h-6 text-green-500" />
             تفاصيل مستحقات الكادر
           </h3>
-          <button className="bg-slate-900 text-white px-6 py-2.5 rounded-xl text-xs font-black hover:bg-amber-500 hover:text-slate-900 transition-all">تصدير مسير الرواتب</button>
+          <button 
+            onClick={handleExportPayroll}
+            className="bg-slate-900 text-white px-6 py-2.5 rounded-xl text-xs font-black hover:bg-amber-500 hover:text-slate-900 transition-all flex items-center gap-2 active:scale-95 shadow-lg"
+          >
+            <Download className="w-4 h-4" />
+            تصدير مسير الرواتب
+          </button>
         </div>
         
         <div className="overflow-x-auto">

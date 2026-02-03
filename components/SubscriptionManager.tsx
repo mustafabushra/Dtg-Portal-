@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { CreditCard, Search, UserPlus, Filter, Crown, CheckCircle2, X, Trash2, UserCheck } from 'lucide-react';
 import { Subscription } from '../types';
+import { useLanguage } from '../contexts/LanguageContext';
 
 interface SubscriptionManagerProps {
   subscriptions: Subscription[];
@@ -11,6 +12,7 @@ interface SubscriptionManagerProps {
 }
 
 const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ subscriptions, onAdd, onUpdate, onDelete }) => {
+  const { t } = useLanguage();
   const [showModal, setShowModal] = useState(false);
   const [search, setSearch] = useState('');
 
@@ -18,6 +20,12 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ subscriptions
     s.customerName.toLowerCase().includes(search.toLowerCase()) || 
     s.phone.includes(search)
   );
+
+  const handleDelete = (sub: Subscription) => {
+    if (window.confirm(t('confirm_delete'))) {
+      onDelete(sub.id);
+    }
+  };
 
   const handleAddSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -118,7 +126,7 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ subscriptions
                     >
                       <UserCheck className="w-4 h-4" /> تسجيل زيارة
                     </button>
-                    <button onClick={() => onDelete(sub.id)} className="p-2 text-slate-300 hover:text-red-500 transition-all">
+                    <button onClick={() => handleDelete(sub)} className="p-2 text-slate-300 hover:text-red-500 transition-all">
                       <Trash2 className="w-4 h-4" />
                     </button>
                   </td>
