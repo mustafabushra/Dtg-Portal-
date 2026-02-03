@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { Staff, Task, Document } from '../types';
 import { useLanguage } from '../contexts/LanguageContext';
+import ConfirmModal from './ConfirmModal';
 
 interface EmployeePortalProps {
   user: Staff;
@@ -22,6 +23,9 @@ const EmployeePortal: React.FC<EmployeePortalProps> = ({ user, tasks, onComplete
   const [activeTab, setActiveTab] = useState<'OVERVIEW' | 'DOCUMENTS'>('OVERVIEW');
   const [activeTaskDetail, setActiveTaskDetail] = useState<Task | null>(null);
   
+  // Confirmation Modal State
+  const [deleteDocId, setDeleteDocId] = useState<string | null>(null);
+
   const myTasks = tasks.filter(t => t.assignedTo === user.id);
   const pendingTasks = myTasks.filter(t => t.status === 'pending');
   const completedTasks = myTasks.filter(t => t.status === 'completed');
@@ -31,14 +35,31 @@ const EmployeePortal: React.FC<EmployeePortalProps> = ({ user, tasks, onComplete
     return Math.ceil(diff / (1000 * 3600 * 24));
   };
 
-  const handleDeleteDocument = (docId: string) => {
-    if (!window.confirm(t('confirm_delete'))) return;
-    const updatedDocs = user.documents.filter(d => d.id !== docId);
-    onUpdateStaff({ ...user, documents: updatedDocs });
+  const handleDeleteDocumentClick = (e: React.MouseEvent, docId: string) => {
+    e.stopPropagation();
+    setDeleteDocId(docId);
+  };
+
+  const confirmDeleteDocument = () => {
+    if (deleteDocId) {
+      const updatedDocs = user.documents.filter(d => d.id !== deleteDocId);
+      onUpdateStaff({ ...user, documents: updatedDocs });
+      setDeleteDocId(null);
+    }
   };
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700 pb-20">
+      <ConfirmModal 
+        isOpen={!!deleteDocId}
+        title={t('modal_confirm_title')}
+        message={t('confirm_delete')}
+        onConfirm={confirmDeleteDocument}
+        onCancel={() => setDeleteDocId(null)}
+        confirmText={t('btn_confirm')}
+        cancelText={t('btn_cancel')}
+      />
+
       {/* Navigation Tabs */}
       <div className="flex bg-white p-1.5 rounded-2xl shadow-sm border border-slate-200 w-fit mx-auto md:mx-0">
         <button 
@@ -239,7 +260,7 @@ const EmployeePortal: React.FC<EmployeePortalProps> = ({ user, tasks, onComplete
                         </div>
                         <div className="flex items-center gap-2">
                            <button 
-                             onClick={() => handleDeleteDocument(doc.id)} 
+                             onClick={(e) => handleDeleteDocumentClick(e, doc.id)} 
                              className="p-2 bg-slate-50 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
                              title="حذف الوثيقة"
                            >

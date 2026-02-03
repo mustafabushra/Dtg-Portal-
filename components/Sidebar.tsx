@@ -18,7 +18,7 @@ interface SidebarProps {
   systemName: string; // Keep for fallback, but prefer translation
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ currentView, setCurrentView, userType, staffUser, onLogout, isOpen, setIsOpen, logoUrl }) => {
+const Sidebar: React.FC<SidebarProps> = ({ currentView, setCurrentView, userType, staffUser, onLogout, isOpen, setIsOpen, logoUrl, systemName }) => {
   const { t, dir } = useLanguage();
 
   const allItems = [
@@ -63,7 +63,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setCurrentView, userType
               <img src={logoUrl} alt="Logo" className="w-full h-full object-contain" />
             </div>
             <div className="min-w-0">
-              <h1 className="text-lg font-black tracking-tight text-white leading-none truncate">{t('systemName')}</h1>
+              <h1 className="text-lg font-black tracking-tight text-white leading-none truncate">{systemName}</h1>
               <p className="text-[10px] text-amber-500 font-bold mt-1 uppercase tracking-widest">Cloud System</p>
             </div>
           </div>

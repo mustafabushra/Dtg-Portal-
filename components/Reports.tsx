@@ -2,10 +2,11 @@
 import React from 'react';
 import { 
   LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  BarChart, Bar
+  BarChart, Bar, PieChart, Pie, Cell
 } from 'recharts';
-import { Download, Calendar, Filter, ArrowUpRight, ArrowDownRight, TrendingUp, DollarSign, Wallet } from 'lucide-react';
+import { Download, Calendar, Filter, ArrowUpRight, ArrowDownRight, TrendingUp, DollarSign, Wallet, PieChart as PieIcon } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
+import { Category } from '../types';
 
 interface ReportsProps {
   data: any;
@@ -30,6 +31,25 @@ const Reports: React.FC<ReportsProps> = ({ data }) => {
     { name: t('rep_payroll'), amount: totalPayroll }
   ];
 
+  // Calculate Inventory Values per Category
+  const getStockValue = (cat: string) => {
+    return data.inventory
+      .filter((i: any) => i.category === cat)
+      .reduce((acc: number, i: any) => acc + (i.quantity * (i.costPerUnit || 0)), 0);
+  };
+
+  const kitchenVal = getStockValue(Category.KITCHEN);
+  const barVal = getStockValue(Category.BAR);
+  const storeVal = getStockValue(Category.STORE);
+
+  const stockValueData = [
+    { name: t('rep_val_kitchen'), value: kitchenVal, color: '#f97316' },
+    { name: t('rep_val_bar'), value: barVal, color: '#3b82f6' },
+    { name: t('rep_val_store'), value: storeVal, color: '#10b981' }
+  ];
+
+  const totalStockValue = kitchenVal + barVal + storeVal;
+
   const handleExportReport = () => {
     const csvContent = [
       ["Metric", "Value"],
@@ -39,6 +59,10 @@ const Reports: React.FC<ReportsProps> = ({ data }) => {
       [t('rep_in'), treasuryIn],
       [t('rep_out'), treasuryOut],
       [t('rep_payroll'), totalPayroll],
+      ["Inventory Value (Kitchen)", kitchenVal],
+      ["Inventory Value (Bar)", barVal],
+      ["Inventory Value (Store)", storeVal],
+      ["Total Stock Value", totalStockValue],
       ["Net Balance", treasuryIn - treasuryOut - totalPayroll]
     ].map(e => e.join(",")).join("\n");
 
@@ -87,13 +111,13 @@ const Reports: React.FC<ReportsProps> = ({ data }) => {
         <ReportMetricCard title={t('rep_metric_balance')} value={`${(treasuryIn - treasuryOut - totalPayroll).toLocaleString()} ${t('currency')}`} trend="=" up={true} icon={Wallet} />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-200">
           <h3 className="text-lg font-black mb-6 flex items-center justify-between text-slate-900">
             {t('rep_dist_assets')}
             <Filter className="w-4 h-4 text-slate-300 cursor-pointer" />
           </h3>
-          <div className="h-[300px]">
+          <div className="h-[250px]">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={inventoryStats}>
                 <defs>
@@ -119,7 +143,7 @@ const Reports: React.FC<ReportsProps> = ({ data }) => {
                <span className="flex items-center gap-1 text-[10px] font-black text-slate-400 uppercase tracking-widest"><span className="w-2 h-2 rounded-full bg-slate-900"></span> Live</span>
             </div>
           </h3>
-          <div className="h-[300px]">
+          <div className="h-[250px]">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={financialData}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
@@ -130,6 +154,41 @@ const Reports: React.FC<ReportsProps> = ({ data }) => {
               </BarChart>
             </ResponsiveContainer>
           </div>
+        </div>
+
+        {/* Stock Value Distribution */}
+        <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-200">
+           <h3 className="text-lg font-black mb-6 flex items-center gap-2 text-slate-900">
+             <PieIcon className="w-5 h-5 text-emerald-500" />
+             {t('rep_val_breakdown')}
+           </h3>
+           <div className="h-[200px] relative">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie data={stockValueData} innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value">
+                    {stockValueData.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} />)}
+                  </Pie>
+                  <Tooltip />
+                </PieChart>
+              </ResponsiveContainer>
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                 <div className="text-center">
+                    <p className="text-[10px] font-black text-slate-400 uppercase">الإجمالي</p>
+                    <p className="text-lg font-black text-slate-900">{totalStockValue.toLocaleString()}</p>
+                 </div>
+              </div>
+           </div>
+           <div className="mt-4 space-y-2">
+              {stockValueData.map((d, i) => (
+                <div key={i} className="flex justify-between items-center text-xs">
+                   <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded-full" style={{backgroundColor: d.color}}></div>
+                      <span className="font-bold text-slate-600">{d.name}</span>
+                   </div>
+                   <span className="font-black text-slate-900">{d.value.toLocaleString()}</span>
+                </div>
+              ))}
+           </div>
         </div>
       </div>
     </div>

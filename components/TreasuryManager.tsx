@@ -4,6 +4,7 @@ import { Banknote, ArrowUpRight, ArrowDownRight, Plus, Search, Trash2, Wallet, X
 import { TreasuryTransaction } from '../types';
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip } from 'recharts';
 import { useLanguage } from '../contexts/LanguageContext';
+import ConfirmModal from './ConfirmModal';
 
 interface TreasuryManagerProps {
   transactions: TreasuryTransaction[];
@@ -15,6 +16,9 @@ const TreasuryManager: React.FC<TreasuryManagerProps> = ({ transactions, onAdd, 
   const { t, dir } = useLanguage();
   const [showModal, setShowModal] = useState(false);
   const [search, setSearch] = useState('');
+  
+  // Confirmation Modal State
+  const [deleteId, setDeleteId] = useState<string | null>(null);
 
   const totalIn = transactions.filter(tx => tx.type === 'IN').reduce((acc, tx) => acc + tx.amount, 0);
   const totalOut = transactions.filter(tx => tx.type === 'OUT').reduce((acc, tx) => acc + tx.amount, 0);
@@ -27,9 +31,15 @@ const TreasuryManager: React.FC<TreasuryManagerProps> = ({ transactions, onAdd, 
 
   const filtered = transactions.filter(tx => tx.description.includes(search) || tx.referenceNumber.includes(search));
 
-  const handleDelete = (tx: TreasuryTransaction) => {
-    if (window.confirm(t('confirm_delete'))) {
-      onDelete(tx.id);
+  const handleDeleteClick = (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    setDeleteId(id);
+  };
+
+  const confirmDelete = () => {
+    if (deleteId) {
+      onDelete(deleteId);
+      setDeleteId(null);
     }
   };
 
@@ -51,6 +61,16 @@ const TreasuryManager: React.FC<TreasuryManagerProps> = ({ transactions, onAdd, 
 
   return (
     <div className="space-y-6 animate-in fade-in duration-700">
+      <ConfirmModal 
+        isOpen={!!deleteId}
+        title={t('modal_confirm_title')}
+        message={t('confirm_delete')}
+        onConfirm={confirmDelete}
+        onCancel={() => setDeleteId(null)}
+        confirmText={t('btn_confirm')}
+        cancelText={t('btn_cancel')}
+      />
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm relative overflow-hidden group">
@@ -147,7 +167,7 @@ const TreasuryManager: React.FC<TreasuryManagerProps> = ({ transactions, onAdd, 
                     {tx.type === 'IN' ? '+' : '-'}{tx.amount.toLocaleString()}
                   </td>
                   <td className="px-8 py-5 text-end">
-                    <button onClick={()=>handleDelete(tx)} className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"><Trash2 className="w-4 h-4" /></button>
+                    <button onClick={(e)=>handleDeleteClick(e, tx.id)} className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"><Trash2 className="w-4 h-4" /></button>
                   </td>
                 </tr>
               ))}
@@ -183,7 +203,7 @@ const TreasuryManager: React.FC<TreasuryManagerProps> = ({ transactions, onAdd, 
                      {tx.amount.toLocaleString()} <span className="text-xs text-slate-400">SR</span>
                   </div>
                   <button 
-                    onClick={() => handleDelete(tx)}
+                    onClick={(e) => handleDeleteClick(e, tx.id)}
                     className="p-2 bg-slate-50 text-slate-300 rounded-xl hover:bg-red-50 hover:text-red-500 transition-colors"
                   >
                      <Trash2 className="w-4 h-4" />

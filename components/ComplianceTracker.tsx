@@ -33,7 +33,8 @@ const ComplianceTracker: React.FC<ComplianceTrackerProps> = ({ documents, onAdd,
     }
   };
 
-  const handleDelete = (doc: Document) => {
+  const handleDelete = (e: React.MouseEvent, doc: Document) => {
+    e.stopPropagation();
     if (window.confirm(t('confirm_delete'))) {
       onDelete(doc.id);
     }
@@ -120,7 +121,7 @@ const ComplianceTracker: React.FC<ComplianceTrackerProps> = ({ documents, onAdd,
                   <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border ${getStatusColor(days)}`}>
                     {days < 0 ? t('sub_overdue') : days < 30 ? t('sub_urgent') : t('sub_active')}
                   </span>
-                  <button onClick={() => handleDelete(doc)} className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all">
+                  <button onClick={(e) => handleDelete(e, doc)} className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all">
                     <Trash2 className="w-4 h-4" />
                   </button>
                 </div>

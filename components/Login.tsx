@@ -59,7 +59,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, staffList, logoUrl, systemName }
             <div className="inline-flex p-4 bg-white rounded-3xl shadow-xl mb-6 text-slate-900 border border-slate-100 transform hover:scale-105 transition-transform duration-300">
               <img src={logoUrl} alt="Logo" className="w-16 h-16 md:w-20 md:h-20 object-contain" />
             </div>
-            <h1 className="text-2xl md:text-3xl font-black text-slate-900 tracking-tight">{t('systemName')}</h1>
+            <h1 className="text-2xl md:text-3xl font-black text-slate-900 tracking-tight">{systemName}</h1>
             <p className="text-[10px] font-black text-slate-500 mt-2 uppercase tracking-[0.3em]">{t('systemTagline')}</p>
           </div>
 

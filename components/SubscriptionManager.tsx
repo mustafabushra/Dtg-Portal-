@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { CreditCard, Search, UserPlus, Filter, Crown, CheckCircle2, X, Trash2, UserCheck } from 'lucide-react';
 import { Subscription } from '../types';
 import { useLanguage } from '../contexts/LanguageContext';
+import ConfirmModal from './ConfirmModal';
 
 interface SubscriptionManagerProps {
   subscriptions: Subscription[];
@@ -15,15 +16,24 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ subscriptions
   const { t } = useLanguage();
   const [showModal, setShowModal] = useState(false);
   const [search, setSearch] = useState('');
+  
+  // Confirmation Modal State
+  const [deleteId, setDeleteId] = useState<string | null>(null);
 
   const filteredSubs = subscriptions.filter(s => 
     s.customerName.toLowerCase().includes(search.toLowerCase()) || 
     s.phone.includes(search)
   );
 
-  const handleDelete = (sub: Subscription) => {
-    if (window.confirm(t('confirm_delete'))) {
-      onDelete(sub.id);
+  const handleDeleteClick = (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    setDeleteId(id);
+  };
+
+  const confirmDelete = () => {
+    if (deleteId) {
+      onDelete(deleteId);
+      setDeleteId(null);
     }
   };
 
@@ -52,6 +62,16 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ subscriptions
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
+      <ConfirmModal 
+        isOpen={!!deleteId}
+        title={t('modal_confirm_title')}
+        message={t('confirm_delete')}
+        onConfirm={confirmDelete}
+        onCancel={() => setDeleteId(null)}
+        confirmText={t('btn_confirm')}
+        cancelText={t('btn_cancel')}
+      />
+
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <h2 className="text-2xl font-black flex items-center gap-2 text-slate-900">
           <CreditCard className="w-6 h-6 text-amber-500" /> إدارة الاشتراكات والولاء
@@ -126,7 +146,7 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ subscriptions
                     >
                       <UserCheck className="w-4 h-4" /> تسجيل زيارة
                     </button>
-                    <button onClick={() => handleDelete(sub)} className="p-2 text-slate-300 hover:text-red-500 transition-all">
+                    <button onClick={(e) => handleDeleteClick(e, sub.id)} className="p-2 text-slate-300 hover:text-red-500 transition-all">
                       <Trash2 className="w-4 h-4" />
                     </button>
                   </td>

@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { Staff, AttendanceLog, View, Document } from '../types';
 import { useLanguage } from '../contexts/LanguageContext';
+import ConfirmModal from './ConfirmModal';
 
 interface StaffManagerProps {
   staff: Staff[];
@@ -23,6 +24,10 @@ const StaffManager: React.FC<StaffManagerProps> = ({ staff, onAdd, onDelete, onU
   const [showModal, setShowModal] = useState(false);
   const [editMember, setEditMember] = useState<Staff | null>(null);
   
+  // Confirmation Modal State
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [deleteDocId, setDeleteDocId] = useState<string | null>(null);
+
   // حالات النوافذ المنبثقة
   const [showDetailModal, setShowDetailModal] = useState<'ATTENDANCE' | 'HISTORY' | 'DOCUMENTS' | null>(null);
   const [selectedForDetail, setSelectedForDetail] = useState<Staff | null>(null);
@@ -44,9 +49,32 @@ const StaffManager: React.FC<StaffManagerProps> = ({ staff, onAdd, onDelete, onU
     );
   };
 
-  const handleDeleteStaff = (id: string, name: string) => {
-    if (window.confirm(t('confirm_delete'))) {
-      onDelete(id);
+  const handleDeleteStaffClick = (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    setDeleteId(id);
+  };
+
+  const confirmDeleteStaff = () => {
+    if (deleteId) {
+      onDelete(deleteId);
+      setDeleteId(null);
+    }
+  };
+
+  const handleDeleteDocumentClick = (e: React.MouseEvent, docId: string) => {
+    e.stopPropagation();
+    setDeleteDocId(docId);
+  };
+
+  const confirmDeleteDocument = () => {
+    if (deleteDocId && selectedForDetail) {
+      const updatedStaff = {
+        ...selectedForDetail,
+        documents: selectedForDetail.documents.filter(d => d.id !== deleteDocId)
+      };
+      onUpdate(updatedStaff);
+      setSelectedForDetail(updatedStaff);
+      setDeleteDocId(null);
     }
   };
 
@@ -114,22 +142,27 @@ const StaffManager: React.FC<StaffManagerProps> = ({ staff, onAdd, onDelete, onU
     e.currentTarget.reset(); // تفريغ النموذج
   };
 
-  // دالة حذف وثيقة من الموظف
-  const handleDeleteDocument = (docId: string) => {
-    if (!selectedForDetail) return;
-    if (!window.confirm(t('confirm_delete'))) return;
-
-    const updatedStaff = {
-      ...selectedForDetail,
-      documents: selectedForDetail.documents.filter(d => d.id !== docId)
-    };
-
-    onUpdate(updatedStaff);
-    setSelectedForDetail(updatedStaff);
-  };
-
   return (
     <div className="space-y-6 animate-in fade-in duration-700">
+      <ConfirmModal 
+        isOpen={!!deleteId}
+        title={t('modal_confirm_title')}
+        message={t('confirm_delete')}
+        onConfirm={confirmDeleteStaff}
+        onCancel={() => setDeleteId(null)}
+        confirmText={t('btn_confirm')}
+        cancelText={t('btn_cancel')}
+      />
+      <ConfirmModal 
+        isOpen={!!deleteDocId}
+        title={t('modal_confirm_title')}
+        message={t('confirm_delete')}
+        onConfirm={confirmDeleteDocument}
+        onCancel={() => setDeleteDocId(null)}
+        confirmText={t('btn_confirm')}
+        cancelText={t('btn_cancel')}
+      />
+
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-black text-slate-900 flex items-center gap-2">
           <Users className="w-6 h-6 text-amber-500" /> {t('staff_title')}
@@ -157,7 +190,7 @@ const StaffManager: React.FC<StaffManagerProps> = ({ staff, onAdd, onDelete, onU
               <div className="flex flex-col gap-1">
                 <button onClick={() => { setEditMember(member); setShowModal(true); }} className="p-2 text-slate-300 hover:text-amber-500 transition-colors"><Edit className="w-4 h-4" /></button>
                 <button onClick={() => { setSelectedForDetail(member); setShowDetailModal('DOCUMENTS'); }} className="p-2 text-slate-300 hover:text-blue-500 transition-colors" title="Employee File"><FolderOpen className="w-4 h-4" /></button>
-                <button onClick={() => handleDeleteStaff(member.id, member.name)} className="p-2 text-slate-300 hover:text-red-500 transition-colors"><Trash2 className="w-4 h-4" /></button>
+                <button onClick={(e) => handleDeleteStaffClick(e, member.id)} className="p-2 text-slate-300 hover:text-red-500 transition-colors"><Trash2 className="w-4 h-4" /></button>
               </div>
             </div>
 
@@ -341,7 +374,7 @@ const StaffManager: React.FC<StaffManagerProps> = ({ staff, onAdd, onDelete, onU
                             </a>
                           )}
                           <button 
-                            onClick={() => handleDeleteDocument(doc.id)}
+                            onClick={(e) => handleDeleteDocumentClick(e, doc.id)}
                             className="p-2 bg-slate-50 text-slate-400 rounded-lg hover:bg-red-50 hover:text-red-500 transition-colors"
                           >
                             <Trash2 className="w-4 h-4" />

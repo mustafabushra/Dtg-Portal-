@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { Plus, Search, Trash2, Edit, X, Package, Wrench, Image as ImageIcon, AlertCircle, History, DollarSign, Calendar, FileText, Clock, Utensils, Wine, Box } from 'lucide-react';
 import { InventoryItem, Asset, Category, MaintenanceRecord } from '../types';
 import { useLanguage } from '../contexts/LanguageContext';
+import ConfirmModal from './ConfirmModal';
 
 interface InventoryManagerProps {
   inventory: InventoryItem[];
@@ -26,6 +27,9 @@ const InventoryManager: React.FC<InventoryManagerProps> = ({
   const [editItem, setEditItem] = useState<InventoryItem | Asset | null>(null);
   const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
   const [search, setSearch] = useState('');
+  
+  // Confirmation Modal State
+  const [deleteTarget, setDeleteTarget] = useState<{id: string, type: 'STOCK' | 'ASSET'} | null>(null);
 
   const filteredStock = inventory.filter(i => {
     const matchesSearch = i.name.toLowerCase().includes(search.toLowerCase());
@@ -34,6 +38,8 @@ const InventoryManager: React.FC<InventoryManagerProps> = ({
   });
 
   const filteredAssets = assets.filter(a => a.name.toLowerCase().includes(search.toLowerCase()));
+
+  const totalStockValue = filteredStock.reduce((acc, item) => acc + (item.quantity * (item.costPerUnit || 0)), 0);
 
   const handleOpenAdd = () => {
     setEditItem(null);
@@ -83,6 +89,7 @@ const InventoryManager: React.FC<InventoryManagerProps> = ({
         quantity: Number(formData.get('quantity')),
         unit: formData.get('unit') as string,
         minLimit: Number(formData.get('minLimit')),
+        costPerUnit: Number(formData.get('costPerUnit')) || 0,
         lastUpdated: new Date().toISOString().split('T')[0],
         imageUrl: formData.get('imageUrl') as string || undefined,
         expiryDate: formData.get('expiryDate') as string || undefined,
@@ -125,19 +132,34 @@ const InventoryManager: React.FC<InventoryManagerProps> = ({
     e.currentTarget.reset();
   };
 
-  const handleDelete = (id: string) => {
-    if (window.confirm(t('confirm_delete'))) {
-      if (tab === 'STOCK') {
-        onDeleteItem(id);
+  const handleDeleteClick = (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    setDeleteTarget({ id, type: tab === 'STOCK' ? 'STOCK' : 'ASSET' });
+  };
+
+  const confirmDelete = () => {
+    if (deleteTarget) {
+      if (deleteTarget.type === 'STOCK') {
+        onDeleteItem(deleteTarget.id);
       } else {
-        onDeleteAsset(id);
+        onDeleteAsset(deleteTarget.id);
       }
+      setDeleteTarget(null);
     }
   };
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
-      
+      <ConfirmModal 
+        isOpen={!!deleteTarget}
+        title={t('modal_confirm_title')}
+        message={t('confirm_delete')}
+        onConfirm={confirmDelete}
+        onCancel={() => setDeleteTarget(null)}
+        confirmText={t('btn_confirm')}
+        cancelText={t('btn_cancel')}
+      />
+
       {/* Main Tabs (Stock vs Assets) */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex bg-white p-1.5 rounded-2xl shadow-sm border border-slate-200">
@@ -159,31 +181,39 @@ const InventoryManager: React.FC<InventoryManagerProps> = ({
 
       {/* Sub Filters for Stock (Kitchen/Bar/Store/All) */}
       {tab === 'STOCK' && (
-        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-2">
-           <button 
-             onClick={() => setCategoryFilter('ALL')} 
-             className={`px-4 py-2 rounded-xl text-xs font-black transition-all border ${categoryFilter === 'ALL' ? 'bg-slate-800 text-white border-slate-800' : 'bg-white text-slate-500 border-slate-200 hover:border-slate-300'}`}
-           >
-             {t('inv_filter_all')}
-           </button>
-           <button 
-             onClick={() => setCategoryFilter(Category.KITCHEN)} 
-             className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black transition-all border ${categoryFilter === Category.KITCHEN ? 'bg-orange-500 text-white border-orange-500 shadow-lg shadow-orange-500/20' : 'bg-white text-slate-500 border-slate-200 hover:border-orange-200 hover:text-orange-500'}`}
-           >
-             <Utensils className="w-3 h-3" /> {t('inv_filter_kitchen')}
-           </button>
-           <button 
-             onClick={() => setCategoryFilter(Category.BAR)} 
-             className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black transition-all border ${categoryFilter === Category.BAR ? 'bg-blue-500 text-white border-blue-500 shadow-lg shadow-blue-500/20' : 'bg-white text-slate-500 border-slate-200 hover:border-blue-200 hover:text-blue-500'}`}
-           >
-             <Wine className="w-3 h-3" /> {t('inv_filter_bar')}
-           </button>
-           <button 
-             onClick={() => setCategoryFilter(Category.STORE)} 
-             className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black transition-all border ${categoryFilter === Category.STORE ? 'bg-emerald-500 text-white border-emerald-500 shadow-lg shadow-emerald-500/20' : 'bg-white text-slate-500 border-slate-200 hover:border-emerald-200 hover:text-emerald-500'}`}
-           >
-             <Box className="w-3 h-3" /> {t('inv_filter_store')}
-           </button>
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-2">
+             <button 
+               onClick={() => setCategoryFilter('ALL')} 
+               className={`px-4 py-2 rounded-xl text-xs font-black transition-all border ${categoryFilter === 'ALL' ? 'bg-slate-800 text-white border-slate-800' : 'bg-white text-slate-500 border-slate-200 hover:border-slate-300'}`}
+             >
+               {t('inv_filter_all')}
+             </button>
+             <button 
+               onClick={() => setCategoryFilter(Category.KITCHEN)} 
+               className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black transition-all border ${categoryFilter === Category.KITCHEN ? 'bg-orange-500 text-white border-orange-500 shadow-lg shadow-orange-500/20' : 'bg-white text-slate-500 border-slate-200 hover:border-orange-200 hover:text-orange-500'}`}
+             >
+               <Utensils className="w-3 h-3" /> {t('inv_filter_kitchen')}
+             </button>
+             <button 
+               onClick={() => setCategoryFilter(Category.BAR)} 
+               className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black transition-all border ${categoryFilter === Category.BAR ? 'bg-blue-500 text-white border-blue-500 shadow-lg shadow-blue-500/20' : 'bg-white text-slate-500 border-slate-200 hover:border-blue-200 hover:text-blue-500'}`}
+             >
+               <Wine className="w-3 h-3" /> {t('inv_filter_bar')}
+             </button>
+             <button 
+               onClick={() => setCategoryFilter(Category.STORE)} 
+               className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black transition-all border ${categoryFilter === Category.STORE ? 'bg-emerald-500 text-white border-emerald-500 shadow-lg shadow-emerald-500/20' : 'bg-white text-slate-500 border-slate-200 hover:border-emerald-200 hover:text-emerald-500'}`}
+             >
+               <Box className="w-3 h-3" /> {t('inv_filter_store')}
+             </button>
+          </div>
+          
+          <div className="bg-emerald-50 px-4 py-2 rounded-xl border border-emerald-100 flex items-center gap-2 text-emerald-800">
+             <DollarSign className="w-4 h-4" />
+             <span className="text-[10px] font-bold uppercase">{t('inv_total_val_est')}:</span>
+             <span className="text-sm font-black">{totalStockValue.toLocaleString()} {t('currency')}</span>
+          </div>
         </div>
       )}
 
@@ -211,6 +241,7 @@ const InventoryManager: React.FC<InventoryManagerProps> = ({
                   <th className="px-8 py-4 text-start">{t('inv_col_name')}</th>
                   <th className="px-8 py-4 text-start">{t('inv_col_category')}</th>
                   <th className="px-8 py-4 text-start">{t('inv_col_qty')}</th>
+                  <th className="px-8 py-4 text-start">{t('inv_col_cost')}</th>
                   <th className="px-8 py-4 text-start">{t('inv_col_expiry')}</th>
                   <th className="px-8 py-4 text-start">{t('inv_col_actions')}</th>
                 </tr>
@@ -228,6 +259,7 @@ const InventoryManager: React.FC<InventoryManagerProps> = ({
               {tab === 'STOCK' ? filteredStock.map(item => {
                 const urgentExpiry = isExpiryUrgent(item.expiryDate);
                 const isExpired = item.expiryDate && new Date(item.expiryDate) < new Date();
+                const totalVal = item.quantity * (item.costPerUnit || 0);
                 return (
                   <tr key={item.id} className="hover:bg-slate-50 transition-colors group">
                     <td className="px-8 py-5">
@@ -244,6 +276,12 @@ const InventoryManager: React.FC<InventoryManagerProps> = ({
                     <td className="px-8 py-5 text-sm font-black text-slate-900">{item.name}</td>
                     <td className="px-8 py-5"><span className={`px-3 py-1 rounded-lg text-[10px] font-black ${item.category === Category.KITCHEN ? 'bg-orange-100 text-orange-700' : item.category === Category.BAR ? 'bg-blue-100 text-blue-700' : 'bg-emerald-100 text-emerald-700'}`}>{item.category}</span></td>
                     <td className="px-8 py-5 text-sm font-bold text-slate-700">{item.quantity} {item.unit}</td>
+                    <td className="px-8 py-5 text-sm font-bold">
+                       <div className="flex flex-col">
+                          <span className="text-slate-900">{totalVal.toLocaleString()}</span>
+                          <span className="text-[9px] text-slate-400">@{item.costPerUnit || 0} / {item.unit}</span>
+                       </div>
+                    </td>
                     <td className={`px-8 py-5 text-xs font-bold ${urgentExpiry ? 'text-rose-600' : 'text-slate-500'}`}>
                       <div className="flex items-center gap-2">
                         {item.expiryDate || 'N/A'}
@@ -260,7 +298,7 @@ const InventoryManager: React.FC<InventoryManagerProps> = ({
                     <td className="px-8 py-5 flex items-center gap-2">
                       <button onClick={() => handleOpenEdit(item)} className="p-2 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-all"><Edit className="w-4 h-4" /></button>
                       <button 
-                        onClick={() => handleDelete(item.id)} 
+                        onClick={(e) => handleDeleteClick(e, item.id)} 
                         className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
                       >
                         <Trash2 className="w-4 h-4" />
@@ -294,7 +332,7 @@ const InventoryManager: React.FC<InventoryManagerProps> = ({
                       <button onClick={() => handleOpenHistory(asset)} className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all" title="Maintenance Log"><History className="w-4 h-4" /></button>
                       <button onClick={() => handleOpenEdit(asset)} className="p-2 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-all"><Edit className="w-4 h-4" /></button>
                       <button 
-                        onClick={() => handleDelete(asset.id)} 
+                        onClick={(e) => handleDeleteClick(e, asset.id)} 
                         className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
                       >
                         <Trash2 className="w-4 h-4" />
@@ -327,12 +365,15 @@ const InventoryManager: React.FC<InventoryManagerProps> = ({
                   </div>
                </div>
                <div className="flex items-center justify-between pt-3 border-t border-slate-100">
-                  <span className="text-[10px] text-slate-400 flex items-center gap-1">
-                     <Clock className="w-3 h-3" /> {item.expiryDate || 'N/A'}
-                  </span>
+                  <div className="flex flex-col">
+                     <span className="text-[10px] font-bold text-slate-500">{(item.quantity * (item.costPerUnit || 0)).toLocaleString()} {t('currency')}</span>
+                     <span className="text-[9px] text-slate-400 flex items-center gap-1">
+                        <Clock className="w-3 h-3" /> {item.expiryDate || 'N/A'}
+                     </span>
+                  </div>
                   <div className="flex gap-2">
                      <button onClick={() => handleOpenEdit(item)} className="p-2 bg-slate-50 text-slate-400 rounded-xl hover:text-amber-600 hover:bg-amber-50"><Edit className="w-4 h-4" /></button>
-                     <button onClick={() => handleDelete(item.id)} className="p-2 bg-slate-50 text-slate-400 rounded-xl hover:text-red-600 hover:bg-red-50"><Trash2 className="w-4 h-4" /></button>
+                     <button onClick={(e) => handleDeleteClick(e, item.id)} className="p-2 bg-slate-50 text-slate-400 rounded-xl hover:text-red-600 hover:bg-red-50"><Trash2 className="w-4 h-4" /></button>
                   </div>
                </div>
             </div>
@@ -350,7 +391,7 @@ const InventoryManager: React.FC<InventoryManagerProps> = ({
                   <div className="flex gap-2">
                      <button onClick={() => handleOpenHistory(asset)} className="p-2 bg-slate-50 text-slate-400 rounded-xl hover:text-blue-600 hover:bg-blue-50"><History className="w-4 h-4" /></button>
                      <button onClick={() => handleOpenEdit(asset)} className="p-2 bg-slate-50 text-slate-400 rounded-xl hover:text-amber-600 hover:bg-amber-50"><Edit className="w-4 h-4" /></button>
-                     <button onClick={() => handleDelete(asset.id)} className="p-2 bg-slate-50 text-slate-400 rounded-xl hover:text-red-600 hover:bg-red-50"><Trash2 className="w-4 h-4" /></button>
+                     <button onClick={(e) => handleDeleteClick(e, asset.id)} className="p-2 bg-slate-50 text-slate-400 rounded-xl hover:text-red-600 hover:bg-red-50"><Trash2 className="w-4 h-4" /></button>
                   </div>
                </div>
             </div>
@@ -379,9 +420,12 @@ const InventoryManager: React.FC<InventoryManagerProps> = ({
                         <option value={Category.STORE}>{t('inv_cat_store')}</option>
                     </select></div>
                   </div>
-                  <div className="grid grid-cols-3 gap-4">
+                  <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2"><label className="text-xs font-black text-slate-500">{t('inv_label_qty')}</label><input name="quantity" defaultValue={(editItem as any)?.quantity} type="number" required className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold" /></div>
                     <div className="space-y-2"><label className="text-xs font-black text-slate-500">{t('inv_label_unit')}</label><input name="unit" defaultValue={(editItem as any)?.unit} placeholder="kg/l" className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold" /></div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2"><label className="text-xs font-black text-slate-500">{t('inv_label_cost_unit')}</label><input name="costPerUnit" defaultValue={(editItem as any)?.costPerUnit} type="number" step="0.01" className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold" placeholder="0.00" /></div>
                     <div className="space-y-2"><label className="text-xs font-black text-slate-500">{t('inv_label_min')}</label><input name="minLimit" defaultValue={(editItem as any)?.minLimit} type="number" className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold" /></div>
                   </div>
                   <div className="grid grid-cols-2 gap-4">

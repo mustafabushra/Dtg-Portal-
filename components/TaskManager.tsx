@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { Task, Staff, TaskType, TaskPriority, RecurrenceType, ChecklistItem } from '../types';
 import { useLanguage } from '../contexts/LanguageContext';
+import ConfirmModal from './ConfirmModal';
 
 interface TaskManagerProps {
   tasks: Task[];
@@ -20,6 +21,9 @@ const TaskManager: React.FC<TaskManagerProps> = ({ tasks, staff, onAddTask, onDe
   const [showModal, setShowModal] = useState(false);
   const [step, setStep] = useState(1);
   
+  // Confirmation Modal State
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+
   const [taskData, setTaskData] = useState({
     title: '',
     description: '',
@@ -61,9 +65,15 @@ const TaskManager: React.FC<TaskManagerProps> = ({ tasks, staff, onAddTask, onDe
     resetForm();
   };
 
-  const handleDelete = (id: string, title: string) => {
-    if (window.confirm(t('confirm_delete'))) {
-      onDeleteTask(id);
+  const handleDeleteClick = (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    setDeleteId(id);
+  };
+
+  const confirmDelete = () => {
+    if (deleteId) {
+      onDeleteTask(deleteId);
+      setDeleteId(null);
     }
   };
 
@@ -94,6 +104,16 @@ const TaskManager: React.FC<TaskManagerProps> = ({ tasks, staff, onAddTask, onDe
 
   return (
     <div className="space-y-6 animate-in fade-in duration-700">
+      <ConfirmModal 
+        isOpen={!!deleteId}
+        title={t('modal_confirm_title')}
+        message={t('confirm_delete')}
+        onConfirm={confirmDelete}
+        onCancel={() => setDeleteId(null)}
+        confirmText={t('btn_confirm')}
+        cancelText={t('btn_cancel')}
+      />
+
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h2 className="text-2xl font-black text-slate-900 flex items-center gap-3">
@@ -125,7 +145,7 @@ const TaskManager: React.FC<TaskManagerProps> = ({ tasks, staff, onAddTask, onDe
                        {task.type}
                     </span>
                  </div>
-                 <button onClick={() => handleDelete(task.id, task.title)} className="p-2 text-slate-200 hover:text-red-500 transition-all"><Trash2 className="w-4 h-4" /></button>
+                 <button onClick={(e) => handleDeleteClick(e, task.id)} className="p-2 text-slate-200 hover:text-red-500 transition-all"><Trash2 className="w-4 h-4" /></button>
               </div>
 
               <h3 className="text-lg font-black text-slate-900 mb-2">{task.title}</h3>

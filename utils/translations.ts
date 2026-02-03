@@ -12,9 +12,12 @@ export const translations = {
     liveSync: "مزامنة حية",
     offline: "غير متصل",
     permissionDenied: "خطأ في الصلاحيات",
-    confirm_delete: "هل أنت متأكد من الحذف؟ هذا الإجراء لا يمكن التراجع عنه.",
+    confirm_delete: "هل أنت متأكد من الحذف؟ لا يمكن التراجع عن هذا الإجراء.",
     search_placeholder: "بحث...",
     currency: "ر.س",
+    modal_confirm_title: "تأكيد الإجراء",
+    btn_confirm: "نعم، حذف",
+    btn_cancel: "إلغاء",
     
     // Login Page
     adminPortal: "بوابة الإدارة",
@@ -102,12 +105,13 @@ export const translations = {
     inv_col_name: "اسم المادة",
     inv_col_category: "القسم",
     inv_col_qty: "الكمية الحالية",
+    inv_col_cost: "التكلفة/قيمة",
     inv_col_expiry: "تاريخ الانتهاء",
     inv_col_actions: "الإجراءات",
     inv_col_asset_name: "اسم الأصل",
     inv_col_purchase_date: "تاريخ الشراء",
     inv_col_maintenance: "الصيانة القادمة",
-    inv_col_cost: "التكلفة",
+    inv_col_cost_asset: "تكلفة الشراء",
     
     inv_modal_edit: "تعديل",
     inv_modal_add_stock: "إضافة مادة للمخزن",
@@ -119,11 +123,13 @@ export const translations = {
     inv_cat_store: "مخزن",
     inv_label_qty: "الكمية",
     inv_label_unit: "الوحدة",
+    inv_label_cost_unit: "تكلفة الوحدة (ر.س)",
     inv_label_min: "الحد الأدنى",
     inv_label_expiry: "تاريخ الانتهاء",
     inv_label_image: "رابط صورة المادة",
     inv_btn_update: "تحديث البيانات",
     inv_btn_confirm: "تأكيد الإضافة",
+    inv_total_val_est: "إجمالي القيمة التقديرية",
     
     // Asset Form
     inv_asset_name: "اسم الأصل",
@@ -219,6 +225,7 @@ export const translations = {
     rep_metric_liability: "إجمالي الالتزامات (صرف/رواتب)",
     rep_metric_balance: "رصيد السيولة الحالي",
     rep_dist_assets: "توزيع الأصول والبيانات",
+    rep_val_breakdown: "قيمة المخزون حسب القسم",
     rep_financial_ind: "المؤشرات المالية (ر.س)",
     rep_inv: "المخزون",
     rep_assets: "الأصول",
@@ -226,6 +233,9 @@ export const translations = {
     rep_in: "الوارد",
     rep_out: "المنصرف",
     rep_payroll: "الرواتب",
+    rep_val_kitchen: "مخزون المطبخ",
+    rep_val_bar: "مخزون البار",
+    rep_val_store: "المخزن الرئيسي",
 
     // Settings
     set_title: "إعدادات النظام الهوية",
@@ -312,6 +322,9 @@ export const translations = {
     confirm_delete: "Are you sure you want to delete? This action cannot be undone.",
     search_placeholder: "Search...",
     currency: "SAR",
+    modal_confirm_title: "Confirm Action",
+    btn_confirm: "Yes, Delete",
+    btn_cancel: "Cancel",
 
     // Login Page
     adminPortal: "Admin Portal",
@@ -399,12 +412,13 @@ export const translations = {
     inv_col_name: "Item Name",
     inv_col_category: "Category",
     inv_col_qty: "Current Qty",
+    inv_col_cost: "Cost/Value",
     inv_col_expiry: "Expiry Date",
     inv_col_actions: "Actions",
     inv_col_asset_name: "Asset Name",
     inv_col_purchase_date: "Purchase Date",
     inv_col_maintenance: "Next Maintenance",
-    inv_col_cost: "Cost",
+    inv_col_cost_asset: "Cost",
     
     inv_modal_edit: "Edit",
     inv_modal_add_stock: "Add Stock Item",
@@ -416,11 +430,13 @@ export const translations = {
     inv_cat_store: "Store",
     inv_label_qty: "Quantity",
     inv_label_unit: "Unit",
+    inv_label_cost_unit: "Unit Cost (SAR)",
     inv_label_min: "Minimum Limit",
     inv_label_expiry: "Expiry Date",
     inv_label_image: "Image URL",
     inv_btn_update: "Update Data",
     inv_btn_confirm: "Confirm Add",
+    inv_total_val_est: "Total Est. Value",
     
     // Asset Form
     inv_asset_name: "Asset Name",
@@ -516,6 +532,7 @@ export const translations = {
     rep_metric_liability: "Total Liabilities (Out/Payroll)",
     rep_metric_balance: "Current Liquidity",
     rep_dist_assets: "Assets Distribution",
+    rep_val_breakdown: "Stock Value Breakdown",
     rep_financial_ind: "Financial Indicators (SAR)",
     rep_inv: "Inventory",
     rep_assets: "Assets",
@@ -523,6 +540,9 @@ export const translations = {
     rep_in: "Inflow",
     rep_out: "Outflow",
     rep_payroll: "Payroll",
+    rep_val_kitchen: "Kitchen Stock",
+    rep_val_bar: "Bar Stock",
+    rep_val_store: "Main Store",
 
     // Settings
     set_title: "System Identity Settings",

@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { Globe, Plus, Calendar, CreditCard, RefreshCw, AlertCircle, Trash2, X, Wifi, ShoppingCart, Smartphone, Terminal, Briefcase } from 'lucide-react';
 import { ServiceSubscription } from '../types';
 import { useLanguage } from '../contexts/LanguageContext';
+import ConfirmModal from './ConfirmModal';
 
 interface ServiceSubscriptionsProps {
   subscriptions: ServiceSubscription[];
@@ -15,6 +16,9 @@ interface ServiceSubscriptionsProps {
 const ServiceSubscriptions: React.FC<ServiceSubscriptionsProps> = ({ subscriptions, onAdd, onUpdate, onDelete, billingThreshold }) => {
   const { t } = useLanguage();
   const [showModal, setShowModal] = useState(false);
+  
+  // Confirmation Modal State
+  const [deleteId, setDeleteId] = useState<string | null>(null);
 
   const getDaysUntil = (date: string) => {
     const diff = new Date(date).getTime() - new Date().getTime();
@@ -36,9 +40,15 @@ const ServiceSubscriptions: React.FC<ServiceSubscriptionsProps> = ({ subscriptio
     // Assuming simple alert is fine or use UI notification
   };
 
-  const handleDelete = (sub: ServiceSubscription) => {
-    if (window.confirm(t('confirm_delete'))) {
-      onDelete(sub.id);
+  const handleDeleteClick = (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    setDeleteId(id);
+  };
+
+  const confirmDelete = () => {
+    if (deleteId) {
+      onDelete(deleteId);
+      setDeleteId(null);
     }
   };
 
@@ -73,6 +83,16 @@ const ServiceSubscriptions: React.FC<ServiceSubscriptionsProps> = ({ subscriptio
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
+      <ConfirmModal 
+        isOpen={!!deleteId}
+        title={t('modal_confirm_title')}
+        message={t('confirm_delete')}
+        onConfirm={confirmDelete}
+        onCancel={() => setDeleteId(null)}
+        confirmText={t('btn_confirm')}
+        cancelText={t('btn_cancel')}
+      />
+
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h2 className="text-2xl font-black text-slate-900">{t('sub_title')}</h2>
@@ -101,7 +121,7 @@ const ServiceSubscriptions: React.FC<ServiceSubscriptionsProps> = ({ subscriptio
                    }`}>
                      {isOverdue ? t('sub_overdue') : isUrgent ? t('sub_urgent') : t('sub_active')}
                    </span>
-                   <button onClick={() => handleDelete(sub)} className="p-2 text-slate-300 hover:text-red-500 transition-colors"><Trash2 className="w-4 h-4" /></button>
+                   <button onClick={(e) => handleDeleteClick(e, sub.id)} className="p-2 text-slate-300 hover:text-red-500 transition-colors"><Trash2 className="w-4 h-4" /></button>
                 </div>
               </div>
 

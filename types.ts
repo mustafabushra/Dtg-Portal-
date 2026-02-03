@@ -115,6 +115,7 @@ export interface InventoryItem {
   quantity: number;
   unit: string;
   minLimit: number;
+  costPerUnit: number; // التكلفة لكل وحدة
   lastUpdated: string;
   imageUrl?: string;
   consumptionRate?: number;

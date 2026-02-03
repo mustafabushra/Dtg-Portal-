@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { Home, User, Phone, Calendar, DollarSign, Plus, Search, Trash2, Edit, X, CheckCircle2, AlertTriangle, Clock, ArrowLeftRight, Building2, BellRing, MoreVertical } from 'lucide-react';
 import { RentalUnit, RentalPayment } from '../types';
 import { useLanguage } from '../contexts/LanguageContext';
+import ConfirmModal from './ConfirmModal';
 
 interface RentalsManagerProps {
   rentals: RentalUnit[];
@@ -18,6 +19,9 @@ const RentalsManager: React.FC<RentalsManagerProps> = ({ rentals, onAdd, onUpdat
   const [selectedUnit, setSelectedUnit] = useState<RentalUnit | null>(null);
   const [editUnit, setEditUnit] = useState<RentalUnit | null>(null);
   const [search, setSearch] = useState('');
+  
+  // Confirmation Modal State
+  const [deleteId, setDeleteId] = useState<string | null>(null);
 
   const filteredRentals = rentals.filter(r => 
     r.unitNumber.includes(search) || r.tenantName.toLowerCase().includes(search.toLowerCase())
@@ -115,9 +119,15 @@ const RentalsManager: React.FC<RentalsManagerProps> = ({ rentals, onAdd, onUpdat
     setEditUnit(null);
   };
 
-  const handleDelete = (unit: RentalUnit) => {
-    if (window.confirm(t('confirm_delete'))) {
-      onDelete(unit.id);
+  const handleDeleteClick = (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    setDeleteId(id);
+  };
+
+  const confirmDelete = () => {
+    if (deleteId) {
+      onDelete(deleteId);
+      setDeleteId(null);
     }
   };
 
@@ -170,6 +180,16 @@ const RentalsManager: React.FC<RentalsManagerProps> = ({ rentals, onAdd, onUpdat
 
   return (
     <div className="space-y-6 animate-in fade-in duration-700">
+      <ConfirmModal 
+        isOpen={!!deleteId}
+        title={t('modal_confirm_title')}
+        message={t('confirm_delete')}
+        onConfirm={confirmDelete}
+        onCancel={() => setDeleteId(null)}
+        confirmText={t('btn_confirm')}
+        cancelText={t('btn_cancel')}
+      />
+
       {/* Top Overview */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="bg-slate-900 text-white p-8 rounded-[2.5rem] shadow-xl relative overflow-hidden">
@@ -312,7 +332,7 @@ const RentalsManager: React.FC<RentalsManagerProps> = ({ rentals, onAdd, onUpdat
                         <button onClick={() => { setEditUnit(unit); setShowModal(true); }} className="p-2 text-slate-300 hover:text-blue-500 transition-colors">
                           <Edit className="w-4 h-4" />
                         </button>
-                        <button onClick={() => handleDelete(unit)} className="p-2 text-slate-300 hover:text-red-500 transition-colors">
+                        <button onClick={(e) => handleDeleteClick(e, unit.id)} className="p-2 text-slate-300 hover:text-red-500 transition-colors">
                           <Trash2 className="w-4 h-4" />
                         </button>
                       </div>
@@ -388,7 +408,7 @@ const RentalsManager: React.FC<RentalsManagerProps> = ({ rentals, onAdd, onUpdat
                     <Edit className="w-4 h-4" />
                   </button>
                   <button 
-                    onClick={() => handleDelete(unit)} 
+                    onClick={(e) => handleDeleteClick(e, unit.id)} 
                     className="p-3 bg-slate-50 text-slate-400 rounded-xl border border-slate-200 hover:bg-white hover:border-red-200 hover:text-red-500 transition-all active:scale-95"
                   >
                     <Trash2 className="w-4 h-4" />
