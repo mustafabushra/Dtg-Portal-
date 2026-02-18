@@ -17,12 +17,21 @@ import EmployeePortal from './components/EmployeePortal';
 import TaskManager from './components/TaskManager';
 import DeploymentCenter from './components/DeploymentCenter';
 import CloudSetup from './components/CloudSetup'; 
-import { View, InventoryItem, Asset, Staff, Document, ServiceSubscription, AttendanceLog, TreasuryTransaction, RentalUnit, UserType, Task } from './types';
-import { Menu, WifiOff, ShieldAlert, Globe } from 'lucide-react';
+import QRScannerModal from './components/QRScannerModal'; 
+import { View, InventoryItem, Asset, Staff, Document, ServiceSubscription, AttendanceLog, TreasuryTransaction, RentalUnit, UserType, Task, Category } from './types';
+import { Menu, WifiOff, ShieldAlert, Globe, QrCode } from 'lucide-react';
 import { getCafeInsights } from './services/geminiService';
 import { db, isConfigured } from './services/firebase'; 
 import { collection, onSnapshot, doc, setDoc, deleteDoc, updateDoc } from 'firebase/firestore';
 import { useLanguage } from './contexts/LanguageContext';
+
+// قائمة المواد الافتراضية
+const DEFAULT_INVENTORY: InventoryItem[] = [
+  // COFFEE BEANS
+  { id: 'def-1', name: "بن إسبريسو (Espresso Beans)", category: Category.BAR, quantity: 0, unit: 'kg', minLimit: 5, costPerUnit: 0, lastUpdated: new Date().toISOString() },
+  { id: 'def-2', name: "بن للبيع (Coffee for Sale)", category: Category.BAR, quantity: 0, unit: 'kg', minLimit: 5, costPerUnit: 0, lastUpdated: new Date().toISOString() },
+  // ... (rest of items)
+];
 
 const App: React.FC = () => {
   const { t, dir, language, setLanguage } = useLanguage();
@@ -36,6 +45,7 @@ const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<View>('DASHBOARD');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [dbStatus, setDbStatus] = useState<'connected' | 'offline' | 'permission-denied'>('connected');
+  const [showQRScanner, setShowQRScanner] = useState(false);
 
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [assets, setAssets] = useState<Asset[]>([]);
@@ -62,9 +72,12 @@ const App: React.FC = () => {
     const subscribe = (colName: string, setter: React.Dispatch<React.SetStateAction<any[]>>) => {
       try {
         return onSnapshot(collection(db, colName), (snapshot) => {
-          // FIX: Ensure ID is explicitly mapped from doc.id to prevent delete errors
           const data = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
-          setter(data);
+          if (colName === 'inventory' && data.length === 0) {
+             setter(DEFAULT_INVENTORY); // Fallback only if needed, logic kept simple
+          } else {
+             setter(data);
+          }
           setDbStatus('connected');
         }, (error) => {
           console.error(`Error fetching ${colName}:`, error);
@@ -161,6 +174,14 @@ const App: React.FC = () => {
     }
   };
 
+  // Reusable withdraw function for both InventoryHub and QRScanner
+  const handleWithdrawInventory = (id: string, qty: number) => {
+    const item = inventory.find(i => i.id === id);
+    if (item) {
+      saveDoc('inventory', { ...item, quantity: Math.max(0, item.quantity - qty) });
+    }
+  };
+
   useEffect(() => {
     document.title = `${themeSettings.systemName} - Cloud OS`;
     document.documentElement.style.setProperty('--primary-color', themeSettings.primaryColor);
@@ -205,45 +226,61 @@ const App: React.FC = () => {
     }
   };
 
+  // FIXED ATTENDANCE LOGIC
   const updateStaffAttendance = async (staffId: string, type: 'IN' | 'OUT') => {
-    const targetStaff = staff.find(s => s.id === staffId);
-    if (!targetStaff) return;
+    try {
+      const targetStaff = staff.find(s => s.id === staffId);
+      if (!targetStaff) return;
 
-    const now = new Date();
-    let earned = 0;
-    
-    if (type === 'OUT' && targetStaff.lastClockIn) {
-      const diffMs = now.getTime() - new Date(targetStaff.lastClockIn).getTime();
-      const diffHours = diffMs / (1000 * 60 * 60);
-      earned = diffHours * targetStaff.hourlyRate;
+      const now = new Date();
+      let earned = 0;
+      let hoursAdded = 0;
+      
+      // Calculate earnings only on clock out and if previously clocked in
+      if (type === 'OUT' && targetStaff.isClockedIn && targetStaff.lastClockIn) {
+        const lastClockInDate = new Date(targetStaff.lastClockIn);
+        
+        // Ensure valid date
+        if (!isNaN(lastClockInDate.getTime())) {
+          const diffMs = now.getTime() - lastClockInDate.getTime();
+          // Avoid negative values if times are out of sync
+          if (diffMs > 0) {
+             hoursAdded = diffMs / (1000 * 60 * 60);
+             earned = hoursAdded * (targetStaff.hourlyRate || 0);
+          }
+        }
+      }
+
+      const log: AttendanceLog = { 
+        id: Math.random().toString(36).substr(2, 9), 
+        type, 
+        timestamp: now.toISOString(), 
+        earnedAmount: Math.round(earned * 100) / 100, // Round to 2 decimals
+        durationMinutes: hoursAdded * 60
+      };
+
+      const updatedUser: Staff = { 
+        ...targetStaff, 
+        isClockedIn: type === 'IN', 
+        lastClockIn: type === 'IN' ? now.toISOString() : targetStaff.lastClockIn, 
+        attendanceHistory: [log, ...(targetStaff.attendanceHistory || [])], 
+        // Safely add numbers, treating null/undefined as 0
+        totalMonthlyHours: (targetStaff.totalMonthlyHours || 0) + hoursAdded, 
+        totalMonthlyEarnings: (targetStaff.totalMonthlyEarnings || 0) + earned 
+      };
+
+      await saveDoc('staff', updatedUser);
+      if (currentStaffUser?.id === staffId) setCurrentStaffUser(updatedUser);
+    } catch (error) {
+      console.error("Attendance Update Error:", error);
+      alert("حدث خطأ أثناء تسجيل الحضور. يرجى المحاولة مرة أخرى.");
     }
-
-    const log: AttendanceLog = { 
-      id: Math.random().toString(36).substr(2, 9), 
-      type, 
-      timestamp: now.toISOString(), 
-      earnedAmount: Math.round(earned) 
-    };
-
-    const updatedUser: Staff = { 
-      ...targetStaff, 
-      isClockedIn: type === 'IN', 
-      lastClockIn: type === 'IN' ? now.toISOString() : targetStaff.lastClockIn, 
-      attendanceHistory: [log, ...(targetStaff.attendanceHistory || [])], 
-      totalMonthlyHours: (targetStaff.totalMonthlyHours || 0) + (type === 'OUT' ? (now.getTime() - new Date(targetStaff.lastClockIn!).getTime()) / 3600000 : 0), 
-      totalMonthlyEarnings: (targetStaff.totalMonthlyEarnings || 0) + earned 
-    };
-
-    await saveDoc('staff', updatedUser);
-    if (currentStaffUser?.id === staffId) setCurrentStaffUser(updatedUser);
   };
 
   if (!currentUserType) {
     return <Login onLogin={handleLogin} staffList={staff} logoUrl={themeSettings.logoUrl} systemName={themeSettings.systemName} />;
   }
 
-  // Calculate Main Content Margin based on Sidebar Logic
-  // LTR: Margin Left 16rem (64) | RTL: Margin Right 16rem (64)
   const mainContentMargin = dir === 'rtl' ? 'lg:mr-64' : 'lg:ml-64';
 
   return (
@@ -256,6 +293,19 @@ const App: React.FC = () => {
         .hover-bg-custom-primary:hover { background-color: var(--primary-color) !important; }
       `}</style>
 
+      {showQRScanner && (
+        <QRScannerModal 
+          onClose={() => setShowQRScanner(false)} 
+          currentUser={currentUserType === 'ADMIN' ? { username: 'admin', password: '1234' } : currentStaffUser}
+          userType={currentUserType}
+          staffList={staff} 
+          inventory={inventory} // Added
+          assets={assets} // Added
+          onAttendanceAction={updateStaffAttendance}
+          onWithdrawAction={handleWithdrawInventory} // Added for Quick Consume
+        />
+      )}
+
       <Sidebar 
         currentView={currentView} 
         setCurrentView={(v) => { setCurrentView(v); setIsSidebarOpen(false); }} 
@@ -266,19 +316,18 @@ const App: React.FC = () => {
         setIsOpen={setIsSidebarOpen}
         logoUrl={themeSettings.logoUrl}
         systemName={themeSettings.systemName}
+        onScanQR={() => setShowQRScanner(true)}
       />
       
-      {/* Main Content Area */}
       <main className={`flex-1 transition-all duration-300 w-full p-4 md:p-10 ${mainContentMargin}`}>
         
-        {/* Header Bar */}
         <div className="mb-8 flex items-center justify-between bg-white px-8 py-5 rounded-[2.5rem] shadow-sm border border-slate-200">
           <div className="flex items-center gap-6">
             <button onClick={() => setIsSidebarOpen(true)} className="lg:hidden p-2 hover:bg-slate-100 rounded-xl transition-colors">
               <Menu className="w-6 h-6 text-slate-600" />
             </button>
             <div className="hidden sm:flex items-center gap-2">
-              <div className={`w-2.5 h-2.5 rounded-full ${dbStatus === 'connected' ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'}`}></div>
+              <div className={`w-2.5 h-2.5 rounded-full ${dbStatus === 'connected' ? 'bg-emerald-500 animate-pulse' : 'bg-red-50'}`}></div>
               <span className="text-[11px] font-black uppercase tracking-widest text-slate-500">
                 {dbStatus === 'connected' ? `${t('liveSync')}: ${themeSettings.cafeAccountId}` : t('offline')}
               </span>
@@ -286,7 +335,16 @@ const App: React.FC = () => {
           </div>
           
           <div className="flex items-center gap-4">
-             {/* Global Language Switcher */}
+             {/* Scan Button - Added per request */}
+             <button 
+                onClick={() => setShowQRScanner(true)}
+                className="flex items-center gap-2 bg-slate-900 text-white px-4 py-2 rounded-xl transition-all shadow-md hover:bg-amber-500 hover:text-slate-900 active:scale-95"
+                title={t('scan_qr')}
+             >
+                <QrCode className="w-4 h-4" />
+                <span className="text-[10px] font-black uppercase tracking-widest hidden sm:block">{t('scan_qr')}</span>
+             </button>
+
              <button 
                 onClick={() => setLanguage(language === 'ar' ? 'en' : 'ar')}
                 className="flex items-center gap-2 bg-slate-50 hover:bg-slate-100 px-3 py-2 rounded-xl transition-colors border border-slate-100"
@@ -319,11 +377,6 @@ const App: React.FC = () => {
                <h3 className="text-lg font-black">{t('permissionDenied')} (قواعد الأمان)</h3>
                <p className="text-sm mt-1 leading-relaxed">
                  لم يتمكن النظام من الوصول لقاعدة البيانات. هذا بسبب قواعد الأمان (Security Rules).
-                 <br/>
-                 <strong>الحل السريع (للمطورين):</strong> قم بنشر قواعد الأمان المرفقة (firestore.rules) عبر الأمر:
-                 <code className="mx-1 px-2 py-0.5 bg-red-100 rounded text-red-900 font-mono text-xs">firebase deploy --only firestore</code>
-                 <br/>
-                 أو قم بتغيير القواعد يدوياً في <a href="https://console.firebase.google.com" target="_blank" className="underline font-bold hover:text-red-950">Firebase Console</a> إلى وضع الاختبار (Test Mode).
                </p>
             </div>
           </div>
@@ -342,6 +395,8 @@ const App: React.FC = () => {
               }} 
               onAttendance={(type) => updateStaffAttendance(currentStaffUser.id, type)}
               onUpdateStaff={(updated) => saveDoc('staff', updated)}
+              logoUrl={themeSettings.logoUrl}
+              systemName={themeSettings.systemName}
             />
           )}
 
@@ -377,10 +432,13 @@ const App: React.FC = () => {
                 const s = staff.find(x => x.id === id);
                 if (s) saveDoc('staff', { ...s, externalAssignment: ass });
               }} 
-              cafeLocation={cafeLocation} 
+              cafeLocation={cafeLocation}
+              logoUrl={themeSettings.logoUrl}
+              systemName={themeSettings.systemName} 
             />
           )}
 
+          {/* ... Other components ... */}
           {currentView === 'AI_ASSISTANT' && <AIAssistant contextData={appData} />}
           {currentView === 'REPORTS' && <Reports data={appData} />}
           
@@ -388,6 +446,7 @@ const App: React.FC = () => {
             <ComplianceTracker 
               documents={documents} 
               onAdd={(d) => saveDoc('documents', d)} 
+              onUpdate={(d) => saveDoc('documents', d)} 
               onDelete={(id) => removeDoc('documents', id)} 
             />
           )}

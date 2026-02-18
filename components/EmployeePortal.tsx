@@ -4,11 +4,12 @@ import {
   User, Clock, FileText, CheckCircle, 
   MapPin, LogIn, LogOut, Wallet, 
   Calendar, ShieldCheck, ClipboardList,
-  ExternalLink, ArrowUpRight, Camera, ListChecks, ChevronLeft, X, FolderOpen, AlertTriangle, LayoutGrid, Download, Trash2
+  ExternalLink, ArrowUpRight, Camera, ListChecks, ChevronLeft, X, FolderOpen, AlertTriangle, LayoutGrid, Download, Trash2, IdCard, Printer
 } from 'lucide-react';
 import { Staff, Task, Document } from '../types';
 import { useLanguage } from '../contexts/LanguageContext';
 import ConfirmModal from './ConfirmModal';
+import QRCode from "react-qr-code";
 
 interface EmployeePortalProps {
   user: Staff;
@@ -16,12 +17,15 @@ interface EmployeePortalProps {
   onCompleteTask: (taskId: string) => void;
   onAttendance: (type: 'IN' | 'OUT') => void;
   onUpdateStaff: (staff: Staff) => void;
+  logoUrl?: string;
+  systemName?: string;
 }
 
-const EmployeePortal: React.FC<EmployeePortalProps> = ({ user, tasks, onCompleteTask, onAttendance, onUpdateStaff }) => {
+const EmployeePortal: React.FC<EmployeePortalProps> = ({ user, tasks, onCompleteTask, onAttendance, onUpdateStaff, logoUrl, systemName }) => {
   const { t } = useLanguage();
   const [activeTab, setActiveTab] = useState<'OVERVIEW' | 'DOCUMENTS'>('OVERVIEW');
   const [activeTaskDetail, setActiveTaskDetail] = useState<Task | null>(null);
+  const [showIdCard, setShowIdCard] = useState(false);
   
   // Confirmation Modal State
   const [deleteDocId, setDeleteDocId] = useState<string | null>(null);
@@ -48,8 +52,44 @@ const EmployeePortal: React.FC<EmployeePortalProps> = ({ user, tasks, onComplete
     }
   };
 
+  const handlePrintCard = () => {
+    window.print();
+  };
+
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700 pb-20">
+      
+      {/* Print Styles for ID Card */}
+      <style>{`
+        @media print {
+          body * {
+            visibility: hidden;
+          }
+          #printable-id-card, #printable-id-card * {
+            visibility: visible;
+          }
+          #printable-id-card {
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            width: 320px;
+            height: 500px;
+            margin: 0 auto;
+            padding: 0;
+            box-shadow: none !important;
+            border: 1px solid #ddd !important;
+            border-radius: 16px !important;
+            background: white !important;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+          }
+          .no-print {
+            display: none !important;
+          }
+        }
+      `}</style>
+
       <ConfirmModal 
         isOpen={!!deleteDocId}
         title={t('modal_confirm_title')}
@@ -93,19 +133,25 @@ const EmployeePortal: React.FC<EmployeePortalProps> = ({ user, tasks, onComplete
             
             <div className="flex flex-col md:flex-row items-center justify-between gap-8 relative z-10">
               <div className="flex flex-col md:flex-row items-center gap-6 text-center md:text-right">
-                <div className="relative">
-                  <img src={`https://api.dicebear.com/7.x/bottts/svg?seed=${user.name}`} className="w-24 h-24 md:w-28 md:h-28 rounded-[2rem] bg-white/10 p-2 border border-white/20 shadow-xl" alt={user.name} />
+                <div className="relative group cursor-pointer" onClick={() => setShowIdCard(true)}>
+                  <img src={`https://api.dicebear.com/7.x/bottts/svg?seed=${user.name}`} className="w-24 h-24 md:w-28 md:h-28 rounded-[2rem] bg-white/10 p-2 border border-white/20 shadow-xl transition-transform group-hover:scale-105" alt={user.name} />
                   {user.isClockedIn && (
                     <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-emerald-500 rounded-full border-4 border-slate-900 flex items-center justify-center">
                         <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
                     </div>
                   )}
+                  <div className="absolute -bottom-2 -left-2 bg-white text-slate-900 p-1.5 rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-opacity">
+                     <IdCard className="w-4 h-4" />
+                  </div>
                 </div>
                 <div>
                   <p className="text-custom-primary text-xs md:text-sm font-black uppercase tracking-[0.2em] mb-1">مرحباً بك مجدداً في نوبتك</p>
                   <h2 className="text-3xl md:text-5xl font-black tracking-tight">{user.name}</h2>
                   <div className="flex flex-wrap items-center justify-center md:justify-start gap-3 mt-4">
                     <span className="px-4 py-1.5 bg-white/10 rounded-full text-[10px] font-black uppercase tracking-widest border border-white/10 backdrop-blur-md">{user.role}</span>
+                    <button onClick={() => setShowIdCard(true)} className="px-4 py-1.5 bg-amber-500 text-slate-900 rounded-full text-[10px] font-black uppercase tracking-widest hover:bg-white transition-colors">
+                       بطاقتي الرقمية
+                    </button>
                   </div>
                 </div>
               </div>
@@ -383,6 +429,67 @@ const EmployeePortal: React.FC<EmployeePortalProps> = ({ user, tasks, onComplete
           </div>
         </div>
       )}
+
+      {/* ID Card Modal (Reused Logic) */}
+      {showIdCard && (
+        <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-md z-[200] flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-md rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+             <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50 no-print">
+                <h3 className="text-xl font-black text-slate-900 flex items-center gap-2">
+                   <IdCard className="w-6 h-6 text-amber-500" /> بطاقتي الرقمية
+                </h3>
+                <button onClick={() => setShowIdCard(false)} className="p-2 hover:bg-white rounded-xl text-slate-400 transition-colors"><X className="w-6 h-6" /></button>
+             </div>
+             
+             <div className="p-8 flex justify-center bg-slate-100">
+                <div id="printable-id-card" className="w-[320px] h-[500px] bg-slate-900 rounded-[20px] relative overflow-hidden shadow-2xl flex flex-col items-center border border-slate-800">
+                   <div className="absolute top-0 w-full h-40 bg-gradient-to-b from-amber-500 to-amber-600 rounded-b-[3rem]"></div>
+                   <div className="relative z-10 flex flex-col items-center w-full h-full pt-8 pb-6 px-6">
+                      
+                      {logoUrl && (
+                        <div className="absolute top-4 right-4 bg-white p-1 rounded-lg shadow-lg">
+                           <img src={logoUrl} className="w-8 h-8 object-contain" alt="Logo" />
+                        </div>
+                      )}
+
+                      <div className="absolute top-32 left-6 w-10 h-8 bg-amber-200/50 rounded-md border border-amber-300/50 flex items-center justify-center">
+                         <div className="w-6 h-5 border border-amber-500/30 rounded-sm grid grid-cols-2 gap-0.5">
+                            <div className="border border-amber-500/30"></div><div className="border border-amber-500/30"></div>
+                            <div className="border border-amber-500/30"></div><div className="border border-amber-500/30"></div>
+                         </div>
+                      </div>
+
+                      <div className="w-32 h-32 rounded-full bg-white p-1.5 shadow-xl mb-4 mt-6">
+                         <img 
+                           src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${user.username}`} 
+                           className="w-full h-full rounded-full bg-slate-100 object-cover" 
+                           alt="Staff" 
+                         />
+                      </div>
+
+                      <h2 className="text-2xl font-black text-white text-center leading-tight mb-1">{user.name}</h2>
+                      <p className="text-slate-400 text-xs font-bold uppercase tracking-widest mb-3">{user.role}</p>
+                      {systemName && <p className="text-[10px] text-amber-500 font-bold mb-4">{systemName}</p>}
+
+                      <div className="mt-auto bg-white p-3 rounded-xl shadow-lg">
+                         <QRCode value={user.id} size={90} fgColor="#0f172a" />
+                      </div>
+                      <p className="text-[10px] text-slate-500 font-bold mt-2 uppercase tracking-[0.2em]">ID: {user.id.substring(0, 8)}</p>
+                   </div>
+                   <div className="absolute bottom-0 right-0 w-32 h-32 bg-white/5 rounded-full -mb-10 -mr-10 blur-2xl"></div>
+                   <div className="absolute bottom-0 left-0 w-24 h-24 bg-amber-500/10 rounded-full -mb-5 -ml-5 blur-xl"></div>
+                </div>
+             </div>
+
+             <div className="p-6 bg-white border-t border-slate-100 flex gap-3 no-print">
+                <button onClick={handlePrintCard} className="flex-1 py-4 bg-slate-900 text-white rounded-2xl font-black flex items-center justify-center gap-2 hover:bg-amber-500 hover:text-slate-900 transition-all shadow-xl active:scale-95">
+                   <Printer className="w-5 h-5" /> طباعة البطاقة
+                </button>
+             </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };

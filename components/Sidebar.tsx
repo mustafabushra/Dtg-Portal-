@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { 
-  LayoutDashboard, Warehouse, Users, FileText, BrainCircuit, BarChart3, Settings as SettingsIcon, Globe, Banknote, Home, UserCircle, LogOut, ClipboardList, X
+  LayoutDashboard, Warehouse, Users, FileText, BrainCircuit, BarChart3, Settings as SettingsIcon, Globe, Banknote, Home, UserCircle, LogOut, ClipboardList, X, QrCode
 } from 'lucide-react';
 import { View, UserType, Staff } from '../types';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -16,9 +16,10 @@ interface SidebarProps {
   setIsOpen: (isOpen: boolean) => void;
   logoUrl: string;
   systemName: string; // Keep for fallback, but prefer translation
+  onScanQR: () => void; // New prop
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ currentView, setCurrentView, userType, staffUser, onLogout, isOpen, setIsOpen, logoUrl, systemName }) => {
+const Sidebar: React.FC<SidebarProps> = ({ currentView, setCurrentView, userType, staffUser, onLogout, isOpen, setIsOpen, logoUrl, systemName, onScanQR }) => {
   const { t, dir } = useLanguage();
 
   const allItems = [
@@ -96,6 +97,16 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setCurrentView, userType
               </button>
             );
           })}
+          
+          {/* Link Device Button */}
+          <button
+             onClick={onScanQR}
+             className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-emerald-400 hover:bg-emerald-500/10 transition-all mt-4 border border-dashed border-slate-700"
+          >
+             <QrCode className="w-5 h-5" />
+             <span className="text-sm">ربط جهاز / Web</span>
+          </button>
+
           {menuItems.length === 0 && (
             <div className="px-4 py-10 text-center opacity-30 italic text-xs">{t('no_access')}</div>
           )}

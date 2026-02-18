@@ -81,6 +81,8 @@ export interface MaintenanceRecord {
 export interface Asset {
   id: string;
   name: string;
+  quantity: number; // Added Quantity
+  imageUrl?: string; // Added Image
   purchaseDate: string;
   maintenanceDate: string;
   cost: number;
@@ -108,6 +110,22 @@ export interface ExternalAssignment {
   endDate: string;
 }
 
+export interface Shift {
+  date: string; // YYYY-MM-DD
+  type: 'MORNING' | 'EVENING' | 'FULL' | 'OFF';
+  startTime: string;
+  endTime: string;
+  note?: string;
+}
+
+export interface DefaultShiftSettings {
+  isAutoScheduled: boolean;
+  weeklyRestDays: number[]; // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+  defaultShiftType: 'MORNING' | 'EVENING';
+  defaultStartTime: string;
+  defaultEndTime: string;
+}
+
 export interface InventoryItem {
   id: string;
   name: string;
@@ -125,11 +143,11 @@ export interface InventoryItem {
 export interface Staff {
   id: string;
   name: string;
-  username: string; // الحقل الجديد المضاف
+  username: string;
   role: string;
   password?: string;
-  shiftStart: string;
-  shiftEnd: string;
+  shiftStart: string; // Legacy, kept for compatibility
+  shiftEnd: string;   // Legacy, kept for compatibility
   hourlyRate: number; 
   documents: Document[];
   performance?: number;
@@ -140,6 +158,8 @@ export interface Staff {
   attendanceHistory?: AttendanceLog[];
   externalAssignment?: ExternalAssignment;
   permissions: string[];
+  shifts?: Shift[]; // الاستثناءات اليدوية
+  shiftSettings?: DefaultShiftSettings; // النمط التلقائي
 }
 
 export interface Document {

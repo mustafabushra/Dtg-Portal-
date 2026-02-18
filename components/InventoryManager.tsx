@@ -1,6 +1,6 @@
 
-import React, { useState } from 'react';
-import { Plus, Search, Trash2, Edit, X, Package, Wrench, Image as ImageIcon, AlertCircle, History, DollarSign, Calendar, FileText, Clock, Utensils, Wine, Box } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { Plus, Search, Trash2, Edit, X, Package, Wrench, Image as ImageIcon, AlertCircle, History, DollarSign, Calendar, FileText, Clock, Utensils, Wine, Box, Download, FileUp, List, Camera, Upload } from 'lucide-react';
 import { InventoryItem, Asset, Category, MaintenanceRecord } from '../types';
 import { useLanguage } from '../contexts/LanguageContext';
 import ConfirmModal from './ConfirmModal';
@@ -21,15 +21,30 @@ const InventoryManager: React.FC<InventoryManagerProps> = ({
 }) => {
   const { t, dir } = useLanguage();
   const [tab, setTab] = useState<'STOCK' | 'ASSETS'>('STOCK');
-  const [categoryFilter, setCategoryFilter] = useState<'ALL' | Category>('ALL'); // فلتر الأقسام
+  const [categoryFilter, setCategoryFilter] = useState<'ALL' | Category>('ALL');
   const [showModal, setShowModal] = useState(false);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [editItem, setEditItem] = useState<InventoryItem | Asset | null>(null);
   const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
   const [search, setSearch] = useState('');
+  const [imagePreview, setImagePreview] = useState<string>('');
+  
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const imageUploadRef = useRef<HTMLInputElement>(null);
   
   // Confirmation Modal State
   const [deleteTarget, setDeleteTarget] = useState<{id: string, type: 'STOCK' | 'ASSET'} | null>(null);
+
+  useEffect(() => {
+    if (editItem) {
+      // Check if it's an InventoryItem or Asset and set image
+      const img = (editItem as InventoryItem).imageUrl || (editItem as Asset).imageUrl;
+      setImagePreview(img || '');
+    } else {
+      setImagePreview('');
+    }
+  }, [editItem, showModal]);
 
   const filteredStock = inventory.filter(i => {
     const matchesSearch = i.name.toLowerCase().includes(search.toLowerCase());
@@ -43,6 +58,7 @@ const InventoryManager: React.FC<InventoryManagerProps> = ({
 
   const handleOpenAdd = () => {
     setEditItem(null);
+    setImagePreview('');
     setShowModal(true);
   };
 
@@ -76,6 +92,41 @@ const InventoryManager: React.FC<InventoryManagerProps> = ({
     return diffDays <= 7;
   };
 
+  const compressImage = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = (event) => {
+        const img = new Image();
+        img.src = event.target?.result as string;
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const MAX_WIDTH = 600;
+          const scaleSize = MAX_WIDTH / img.width;
+          canvas.width = MAX_WIDTH;
+          canvas.height = img.height * scaleSize;
+          const ctx = canvas.getContext('2d');
+          ctx?.drawImage(img, 0, 0, canvas.width, canvas.height);
+          resolve(canvas.toDataURL('image/jpeg', 0.6)); // High compression
+        };
+      };
+      reader.onerror = (error) => reject(error);
+    });
+  };
+
+  const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      try {
+        const compressed = await compressImage(file);
+        setImagePreview(compressed);
+      } catch (err) {
+        console.error("Error processing image", err);
+        alert("حدث خطأ أثناء معالجة الصورة");
+      }
+    }
+  };
+
   const handleAddSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
@@ -91,7 +142,7 @@ const InventoryManager: React.FC<InventoryManagerProps> = ({
         minLimit: Number(formData.get('minLimit')),
         costPerUnit: Number(formData.get('costPerUnit')) || 0,
         lastUpdated: new Date().toISOString().split('T')[0],
-        imageUrl: formData.get('imageUrl') as string || undefined,
+        imageUrl: imagePreview || undefined,
         expiryDate: formData.get('expiryDate') as string || undefined,
       };
       editItem ? onUpdateItem(newItem) : onAddItem(newItem);
@@ -99,6 +150,8 @@ const InventoryManager: React.FC<InventoryManagerProps> = ({
       const newAsset: Asset = {
         id,
         name: formData.get('name') as string,
+        quantity: Number(formData.get('quantity')) || 1, // Added Quantity
+        imageUrl: imagePreview || undefined, // Added Image
         purchaseDate: formData.get('purchaseDate') as string,
         maintenanceDate: formData.get('maintenanceDate') as string,
         cost: Number(formData.get('cost')),
@@ -148,6 +201,75 @@ const InventoryManager: React.FC<InventoryManagerProps> = ({
     }
   };
 
+  const handleLoadDefaults = () => {
+    if (!window.confirm("سيتم إضافة أكثر من 50 صنف إلى مخزونك (القهوة، السيرب، الحليب، الأدوات...). هل أنت متأكد؟")) return;
+
+    const itemsToAdd = [
+        // COFFEE
+        { name: "بن إسبريسو (Espresso Beans)", category: Category.BAR, unit: 'kg' },
+        { name: "بن للبيع (Coffee for Sale)", category: Category.BAR, unit: 'kg' },
+        // ... (rest of items from previous code)
+        { name: "كمامات سوداء (Black Masks)", category: Category.STORE, unit: 'box' },
+    ];
+
+    itemsToAdd.forEach(item => {
+        onAddItem({
+            id: Math.random().toString(36).substr(2, 9),
+            name: item.name,
+            category: item.category as Category,
+            quantity: 0,
+            unit: item.unit,
+            minLimit: 5,
+            costPerUnit: 0,
+            lastUpdated: new Date().toISOString().split('T')[0]
+        });
+    });
+
+    alert("تم إضافة المواد بنجاح! يمكنك الآن تعديل الكميات والأسعار.");
+  };
+
+  const handleImportCSV = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const text = event.target?.result as string;
+      const lines = text.split('\n');
+      let count = 0;
+      lines.forEach((line, index) => {
+         if (index === 0 && (line.includes('Name') || line.includes('اسم'))) return;
+         
+         const parts = line.split(',');
+         if (parts.length >= 1 && parts[0].trim()) {
+            const name = parts[0].trim().replace(/['"]+/g, '');
+            const categoryStr = parts[1]?.trim().replace(/['"]+/g, '');
+            const quantity = parseFloat(parts[2]) || 0;
+            const unit = parts[3]?.trim().replace(/['"]+/g, '') || 'pcs';
+            
+            let category = Category.STORE;
+            if (categoryStr === 'بار' || categoryStr === 'Bar') category = Category.BAR;
+            if (categoryStr === 'مطبخ' || categoryStr === 'Kitchen') category = Category.KITCHEN;
+
+            onAddItem({
+                id: Math.random().toString(36).substr(2, 9),
+                name: name,
+                category: category,
+                quantity: quantity,
+                unit: unit,
+                minLimit: 5,
+                costPerUnit: 0,
+                lastUpdated: new Date().toISOString().split('T')[0]
+            });
+            count++;
+         }
+      });
+      alert(`تم استيراد ${count} صنف بنجاح.`);
+    };
+    reader.readAsText(file);
+    e.target.value = ''; // Reset input
+  };
+
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
       <ConfirmModal 
@@ -173,10 +295,35 @@ const InventoryManager: React.FC<InventoryManagerProps> = ({
           </button>
         </div>
 
-        <button onClick={handleOpenAdd} className="flex items-center gap-2 bg-amber-500 text-slate-900 px-6 py-3 rounded-2xl font-black hover:bg-amber-400 transition-all active:scale-95 shadow-xl shadow-amber-500/10">
-          <Plus className="w-5 h-5" />
-          {tab === 'STOCK' ? t('inv_btn_add_stock') : t('inv_btn_add_asset')}
-        </button>
+        <div className="flex items-center gap-2">
+            {tab === 'STOCK' && (
+                <>
+                    <button 
+                        onClick={handleLoadDefaults}
+                        className="flex items-center gap-2 bg-emerald-500 text-white px-4 py-3 rounded-2xl font-black hover:bg-emerald-600 transition-all shadow-lg active:scale-95 text-xs"
+                    >
+                        <List className="w-4 h-4" /> تحميل القائمة
+                    </button>
+                    <button 
+                        onClick={() => fileInputRef.current?.click()}
+                        className="flex items-center gap-2 bg-white text-slate-600 border border-slate-200 px-4 py-3 rounded-2xl font-black hover:bg-slate-50 transition-all shadow-sm active:scale-95 text-xs"
+                    >
+                        <FileUp className="w-4 h-4" /> استيراد CSV
+                    </button>
+                    <input 
+                        type="file" 
+                        ref={fileInputRef} 
+                        onChange={handleImportCSV} 
+                        accept=".csv" 
+                        className="hidden" 
+                    />
+                </>
+            )}
+            <button onClick={handleOpenAdd} className="flex items-center gap-2 bg-slate-900 text-white px-6 py-3 rounded-2xl font-black hover:bg-amber-500 hover:text-slate-900 transition-all active:scale-95 shadow-xl shadow-slate-900/10 text-xs">
+            <Plus className="w-5 h-5" />
+            {tab === 'STOCK' ? t('inv_btn_add_stock') : t('inv_btn_add_asset')}
+            </button>
+        </div>
       </div>
 
       {/* Sub Filters for Stock (Kitchen/Bar/Store/All) */}
@@ -227,7 +374,7 @@ const InventoryManager: React.FC<InventoryManagerProps> = ({
                type="text" 
                placeholder={t('inv_search_records')} 
                className={`w-full py-3.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-4 focus:ring-amber-500/10 text-sm font-bold ${dir === 'rtl' ? 'pr-12 pl-4' : 'pl-12 pr-4'}`}
-             />
+            />
            </div>
         </div>
 
@@ -247,7 +394,9 @@ const InventoryManager: React.FC<InventoryManagerProps> = ({
                 </tr>
               ) : (
                 <tr>
+                  <th className="px-8 py-4 text-start">{t('inv_col_image')}</th>
                   <th className="px-8 py-4 text-start">{t('inv_col_asset_name')}</th>
+                  <th className="px-8 py-4 text-start">{t('inv_label_qty')}</th>
                   <th className="px-8 py-4 text-start">{t('inv_col_purchase_date')}</th>
                   <th className="px-8 py-4 text-start">{t('inv_col_maintenance')}</th>
                   <th className="px-8 py-4 text-start">{t('inv_col_cost')}</th>
@@ -310,6 +459,17 @@ const InventoryManager: React.FC<InventoryManagerProps> = ({
                 const urgent = isMaintenanceUrgent(asset.maintenanceDate);
                 return (
                   <tr key={asset.id} className="hover:bg-slate-50 transition-colors group">
+                    <td className="px-8 py-5">
+                      <div className="w-12 h-12 rounded-xl bg-slate-100 overflow-hidden border border-slate-200 shadow-sm">
+                        {asset.imageUrl ? (
+                          <img src={asset.imageUrl} alt={asset.name} className="w-full h-full object-cover" />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-slate-300">
+                            <Wrench className="w-5 h-5" />
+                          </div>
+                        )}
+                      </div>
+                    </td>
                     <td className="px-8 py-5 text-sm font-black text-slate-900">
                       <div className="flex flex-col">
                         <span>{asset.name}</span>
@@ -318,6 +478,7 @@ const InventoryManager: React.FC<InventoryManagerProps> = ({
                         )}
                       </div>
                     </td>
+                    <td className="px-8 py-5 text-sm font-bold text-slate-700">{asset.quantity || 1}</td>
                     <td className="px-8 py-5 text-xs text-slate-500 font-bold">{asset.purchaseDate}</td>
                     <td className={`px-8 py-5 text-xs font-bold flex items-center gap-2 ${urgent ? 'text-red-600 animate-pulse' : 'text-amber-600'}`}>
                       {asset.maintenanceDate}
@@ -380,7 +541,15 @@ const InventoryManager: React.FC<InventoryManagerProps> = ({
           )) : filteredAssets.map(asset => (
             <div key={asset.id} className="bg-white p-4 rounded-3xl border border-slate-200 shadow-sm relative overflow-hidden group hover:border-amber-200 transition-all">
                <div className="flex justify-between items-start mb-2">
-                  <h4 className="text-sm font-black text-slate-900">{asset.name}</h4>
+                  <div className="flex items-center gap-3">
+                     <div className="w-12 h-12 rounded-xl bg-slate-100 overflow-hidden border border-slate-200">
+                        {asset.imageUrl ? <img src={asset.imageUrl} className="w-full h-full object-cover" /> : <Wrench className="w-full h-full p-3 text-slate-300" />}
+                     </div>
+                     <div>
+                       <h4 className="text-sm font-black text-slate-900">{asset.name}</h4>
+                       <span className="text-[10px] font-black bg-slate-100 px-2 py-1 rounded-lg text-slate-600">العدد: {asset.quantity || 1}</span>
+                     </div>
+                  </div>
                   <span className="text-[10px] font-black bg-slate-100 px-2 py-1 rounded-lg text-slate-600">{asset.cost.toLocaleString()}</span>
                </div>
                <p className="text-[10px] text-slate-400 font-bold mb-3">{asset.purchaseDate}</p>
@@ -401,61 +570,121 @@ const InventoryManager: React.FC<InventoryManagerProps> = ({
 
       {showModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
-          <div className="bg-white rounded-[2.5rem] w-full max-w-lg shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
-            <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+          <div className="bg-white rounded-[2.5rem] w-full max-w-lg shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 max-h-[90vh] flex flex-col">
+            <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50 shrink-0">
               <h3 className="text-xl font-black text-slate-900">
                 {editItem ? `${t('inv_modal_edit')}: ${editItem.name}` : tab === 'STOCK' ? t('inv_modal_add_stock') : t('inv_modal_add_asset')}
               </h3>
               <button onClick={() => setShowModal(false)} className="p-2 hover:bg-white rounded-xl text-slate-400"><X className="w-6 h-6" /></button>
             </div>
-            <form onSubmit={handleAddSubmit} className="p-8 space-y-6">
-              {tab === 'STOCK' ? (
-                <>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2"><label className="text-xs font-black text-slate-500">{t('inv_label_name')}</label><input name="name" defaultValue={editItem?.name} required className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl focus:ring-4 ring-amber-500/10 outline-none font-bold" /></div>
-                    <div className="space-y-2"><label className="text-xs font-black text-slate-500">{t('inv_label_category')}</label>
-                    <select name="category" defaultValue={(editItem as any)?.category} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold">
-                        <option value={Category.KITCHEN}>{t('inv_cat_kitchen')}</option>
-                        <option value={Category.BAR}>{t('inv_cat_bar')}</option>
-                        <option value={Category.STORE}>{t('inv_cat_store')}</option>
-                    </select></div>
+            
+            <div className="flex-1 overflow-y-auto">
+              <form onSubmit={handleAddSubmit} className="p-8 space-y-6">
+                
+                {/* Common Image Upload Section for BOTH Tabs */}
+                <div className="space-y-3">
+                  <label className="text-xs font-black text-slate-500 flex items-center gap-1">
+                    <ImageIcon className="w-3 h-3" /> {t('inv_label_image') || "صورة"}
+                  </label>
+                  <div className="flex gap-4">
+                    <div className="w-24 h-24 rounded-2xl bg-slate-50 border-2 border-dashed border-slate-200 flex items-center justify-center relative overflow-hidden shrink-0">
+                      {imagePreview ? (
+                        <>
+                          <img src={imagePreview} alt="Preview" className="w-full h-full object-cover" />
+                          <button 
+                            type="button" 
+                            onClick={() => setImagePreview('')}
+                            className="absolute inset-0 bg-black/40 flex items-center justify-center text-white opacity-0 hover:opacity-100 transition-opacity"
+                          >
+                            <X className="w-6 h-6" />
+                          </button>
+                        </>
+                      ) : (
+                        <ImageIcon className="w-8 h-8 text-slate-300" />
+                      )}
+                    </div>
+                    <div className="flex flex-col gap-2 flex-1 justify-center">
+                        <input 
+                          type="file" 
+                          ref={imageUploadRef} 
+                          accept="image/*" 
+                          onChange={handleImageSelect} 
+                          className="hidden" 
+                        />
+                        <input 
+                          type="file" 
+                          ref={cameraInputRef} 
+                          accept="image/*" 
+                          capture="environment"
+                          onChange={handleImageSelect} 
+                          className="hidden" 
+                        />
+                        <div className="flex gap-2">
+                          <button 
+                            type="button" 
+                            onClick={() => cameraInputRef.current?.click()}
+                            className="flex-1 flex items-center justify-center gap-2 py-3 bg-slate-900 text-white rounded-xl text-xs font-black hover:bg-amber-500 hover:text-slate-900 transition-all shadow-md active:scale-95"
+                          >
+                            <Camera className="w-4 h-4" /> تصوير
+                          </button>
+                          <button 
+                            type="button" 
+                            onClick={() => imageUploadRef.current?.click()}
+                            className="flex-1 flex items-center justify-center gap-2 py-3 bg-white border border-slate-200 text-slate-600 rounded-xl text-xs font-black hover:bg-slate-50 transition-all active:scale-95"
+                          >
+                            <Upload className="w-4 h-4" /> رفع
+                          </button>
+                        </div>
+                        <p className="text-[9px] text-slate-400 font-bold">يمكنك التقاط صورة للمنتج مباشرة أو اختيارها من المعرض.</p>
+                    </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2"><label className="text-xs font-black text-slate-500">{t('inv_label_qty')}</label><input name="quantity" defaultValue={(editItem as any)?.quantity} type="number" required className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold" /></div>
-                    <div className="space-y-2"><label className="text-xs font-black text-slate-500">{t('inv_label_unit')}</label><input name="unit" defaultValue={(editItem as any)?.unit} placeholder="kg/l" className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold" /></div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2"><label className="text-xs font-black text-slate-500">{t('inv_label_cost_unit')}</label><input name="costPerUnit" defaultValue={(editItem as any)?.costPerUnit} type="number" step="0.01" className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold" placeholder="0.00" /></div>
-                    <div className="space-y-2"><label className="text-xs font-black text-slate-500">{t('inv_label_min')}</label><input name="minLimit" defaultValue={(editItem as any)?.minLimit} type="number" className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold" /></div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
+                </div>
+
+                {tab === 'STOCK' ? (
+                  <>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2"><label className="text-xs font-black text-slate-500">{t('inv_label_name')}</label><input name="name" defaultValue={editItem?.name} required className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl focus:ring-4 ring-amber-500/10 outline-none font-bold" /></div>
+                      <div className="space-y-2"><label className="text-xs font-black text-slate-500">{t('inv_label_category')}</label>
+                      <select name="category" defaultValue={(editItem as any)?.category} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold">
+                          <option value={Category.KITCHEN}>{t('inv_cat_kitchen')}</option>
+                          <option value={Category.BAR}>{t('inv_cat_bar')}</option>
+                          <option value={Category.STORE}>{t('inv_cat_store')}</option>
+                      </select></div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2"><label className="text-xs font-black text-slate-500">{t('inv_label_qty')}</label><input name="quantity" defaultValue={(editItem as any)?.quantity} type="number" step="any" required className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold" /></div>
+                      <div className="space-y-2"><label className="text-xs font-black text-slate-500">{t('inv_label_unit')}</label><input name="unit" defaultValue={(editItem as any)?.unit} placeholder="kg/l" className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold" /></div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2"><label className="text-xs font-black text-slate-500">{t('inv_label_cost_unit')}</label><input name="costPerUnit" defaultValue={(editItem as any)?.costPerUnit} type="number" step="0.01" className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold" placeholder="0.00" /></div>
+                      <div className="space-y-2"><label className="text-xs font-black text-slate-500">{t('inv_label_min')}</label><input name="minLimit" defaultValue={(editItem as any)?.minLimit} type="number" step="any" className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold" /></div>
+                    </div>
                     <div className="space-y-2">
                       <label className="text-xs font-black text-slate-500 flex items-center gap-1"><Clock className="w-3 h-3 text-rose-500" /> {t('inv_label_expiry')}</label>
                       <input name="expiryDate" type="date" defaultValue={(editItem as any)?.expiryDate} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold" />
                     </div>
-                    <div className="space-y-2">
-                      <label className="text-xs font-black text-slate-500">{t('inv_label_image')}</label>
-                      <input name="imageUrl" defaultValue={(editItem as any)?.imageUrl} placeholder="https://..." className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold text-xs" />
+                  </>
+                ) : (
+                  <>
+                    <div className="grid grid-cols-3 gap-4">
+                      <div className="col-span-2 space-y-2"><label className="text-xs font-black text-slate-500">{t('inv_asset_name')}</label><input name="name" defaultValue={editItem?.name} required className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold" /></div>
+                      <div className="space-y-2"><label className="text-xs font-black text-slate-500">{t('inv_label_qty')}</label><input name="quantity" defaultValue={(editItem as any)?.quantity || 1} type="number" min="1" className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold" /></div>
                     </div>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <div className="space-y-2"><label className="text-xs font-black text-slate-500">{t('inv_asset_name')}</label><input name="name" defaultValue={editItem?.name} required className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold" /></div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2"><label className="text-xs font-black text-slate-500">{t('inv_asset_purchase')}</label><input name="purchaseDate" defaultValue={(editItem as any)?.purchaseDate} type="date" className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold" /></div>
-                    <div className="space-y-2"><label className="text-xs font-black text-slate-500">{t('inv_asset_maintenance')}</label><input name="maintenanceDate" defaultValue={(editItem as any)?.maintenanceDate} type="date" className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold" /></div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2"><label className="text-xs font-black text-slate-500">{t('inv_asset_cost')}</label><input name="cost" defaultValue={(editItem as any)?.cost} type="number" required className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold" /></div>
-                    <div className="space-y-2"><label className="text-xs font-black text-slate-500">{t('inv_asset_status')}</label><select name="status" defaultValue={(editItem as any)?.status} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold"><option value="يعمل">{t('inv_status_working')}</option><option value="تحت الصيانة">{t('inv_status_maintenance')}</option><option value="خارج الخدمة">{t('inv_status_broken')}</option></select></div>
-                  </div>
-                </>
-              )}
-              <button type="submit" className="w-full py-4 bg-slate-900 text-white rounded-[1.5rem] font-black text-lg hover:bg-amber-500 hover:text-slate-900 transition-all shadow-xl shadow-slate-900/10 active:scale-95">
-                {editItem ? t('inv_btn_update') : t('inv_btn_confirm')}
-              </button>
-            </form>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2"><label className="text-xs font-black text-slate-500">{t('inv_asset_purchase')}</label><input name="purchaseDate" defaultValue={(editItem as any)?.purchaseDate} type="date" className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold" /></div>
+                      <div className="space-y-2"><label className="text-xs font-black text-slate-500">{t('inv_asset_maintenance')}</label><input name="maintenanceDate" defaultValue={(editItem as any)?.maintenanceDate} type="date" className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold" /></div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2"><label className="text-xs font-black text-slate-500">{t('inv_asset_cost')}</label><input name="cost" defaultValue={(editItem as any)?.cost} type="number" required className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold" /></div>
+                      <div className="space-y-2"><label className="text-xs font-black text-slate-500">{t('inv_asset_status')}</label><select name="status" defaultValue={(editItem as any)?.status} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold"><option value="يعمل">{t('inv_status_working')}</option><option value="تحت الصيانة">{t('inv_status_maintenance')}</option><option value="خارج الخدمة">{t('inv_status_broken')}</option></select></div>
+                    </div>
+                  </>
+                )}
+                <button type="submit" className="w-full py-4 bg-slate-900 text-white rounded-[1.5rem] font-black text-lg hover:bg-amber-500 hover:text-slate-900 transition-all shadow-xl shadow-slate-900/10 active:scale-95">
+                  {editItem ? t('inv_btn_update') : t('inv_btn_confirm')}
+                </button>
+              </form>
+            </div>
           </div>
         </div>
       )}

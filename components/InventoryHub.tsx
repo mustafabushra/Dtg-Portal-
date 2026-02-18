@@ -45,6 +45,17 @@ const InventoryHub: React.FC<InventoryHubProps> = ({
 
   return (
     <div className="space-y-6 md:space-y-8 animate-in fade-in duration-500">
+      <style>{`
+        /* Hide spin buttons for number inputs */
+        input[type=number]::-webkit-inner-spin-button, 
+        input[type=number]::-webkit-outer-spin-button { 
+          -webkit-appearance: none; 
+          margin: 0; 
+        }
+        input[type=number] {
+          -moz-appearance: textfield;
+        }
+      `}</style>
       <div className="flex bg-white p-1 md:p-2 rounded-xl md:rounded-[1.5rem] shadow-sm border border-slate-200 w-full md:w-fit overflow-x-auto no-scrollbar">
         {[
           { id: 'BARISTA_VIEW', label: t('inv_tab_consumption'), icon: Coffee },
@@ -99,24 +110,48 @@ const InventoryHub: React.FC<InventoryHubProps> = ({
                            {/* Decrease Button (Withdraw 1) */}
                            <button 
                              onClick={() => onWithdraw(item.id, 1)} 
-                             className="w-12 h-12 flex items-center justify-center bg-white text-rose-500 rounded-xl shadow-sm border border-slate-100 hover:bg-rose-500 hover:text-white hover:shadow-lg hover:shadow-rose-500/30 transition-all active:scale-90"
+                             className="w-12 h-12 flex items-center justify-center bg-white text-rose-500 rounded-xl shadow-sm border border-slate-100 hover:bg-rose-500 hover:text-white hover:shadow-lg hover:shadow-rose-500/30 transition-all active:scale-90 shrink-0"
                              title="استهلاك 1"
                            >
                              <Minus className="w-5 h-5" />
                            </button>
 
-                           {/* Central Quantity Display */}
-                           <div className="flex flex-col items-center px-2">
-                              <span className={`text-xl font-black ${item.quantity <= item.minLimit ? 'text-red-500' : 'text-slate-800'}`}>
-                                {item.quantity}
-                              </span>
+                           {/* Central Quantity Display (Editable) */}
+                           <div className="flex flex-col items-center px-2 flex-1 min-w-0">
+                              <input 
+                                type="number" 
+                                step="any"
+                                min="0"
+                                className={`w-full text-center bg-transparent outline-none text-xl font-black p-0 border-b border-transparent focus:border-slate-300 transition-colors ${item.quantity <= item.minLimit ? 'text-red-500' : 'text-slate-800'}`}
+                                defaultValue={item.quantity}
+                                key={item.quantity}
+                                onInvalid={(e) => {
+                                  (e.target as HTMLInputElement).setCustomValidity('القيمة المدخلة غير صالحة. الرجاء إدخال رقم صالح (مثال: 9.8 هللة أو 1.2 كجم).');
+                                }}
+                                onInput={(e) => {
+                                  (e.target as HTMLInputElement).setCustomValidity('');
+                                }}
+                                onBlur={(e) => {
+                                    const val = parseFloat(e.target.value);
+                                    if (!isNaN(val) && val >= 0) {
+                                        onAdjust(item.id, val);
+                                    } else {
+                                        e.target.value = item.quantity.toString();
+                                    }
+                                }}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                        e.currentTarget.blur();
+                                    }
+                                }}
+                              />
                               <span className="text-[9px] font-bold text-slate-400 uppercase">{item.unit}</span>
                            </div>
 
                            {/* Increase Button (Add 1 - essentially withdraw -1) */}
                            <button 
                              onClick={() => onWithdraw(item.id, -1)} 
-                             className="w-12 h-12 flex items-center justify-center bg-white text-emerald-500 rounded-xl shadow-sm border border-slate-100 hover:bg-emerald-500 hover:text-white hover:shadow-lg hover:shadow-emerald-500/30 transition-all active:scale-90"
+                             className="w-12 h-12 flex items-center justify-center bg-white text-emerald-500 rounded-xl shadow-sm border border-slate-100 hover:bg-emerald-500 hover:text-white hover:shadow-lg hover:shadow-emerald-500/30 transition-all active:scale-90 shrink-0"
                              title="إضافة 1 (تراجع)"
                            >
                              <Plus className="w-5 h-5" />

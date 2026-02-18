@@ -18,6 +18,7 @@ export const translations = {
     modal_confirm_title: "تأكيد الإجراء",
     btn_confirm: "نعم، حذف",
     btn_cancel: "إلغاء",
+    scan_qr: "مسح كود (Scan)",
     
     // Login Page
     adminPortal: "بوابة الإدارة",
@@ -325,6 +326,7 @@ export const translations = {
     modal_confirm_title: "Confirm Action",
     btn_confirm: "Yes, Delete",
     btn_cancel: "Cancel",
+    scan_qr: "Scan QR",
 
     // Login Page
     adminPortal: "Admin Portal",

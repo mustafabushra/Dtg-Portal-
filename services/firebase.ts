@@ -1,7 +1,7 @@
 
 import { initializeApp, getApps, getApp, FirebaseOptions } from "firebase/app";
 import { getAuth } from "firebase/auth";
-import { getFirestore } from "firebase/firestore";
+import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from "firebase/firestore";
 import { getAnalytics } from "firebase/analytics";
 
 // إعدادات مشروع DTG Portal الجديد
@@ -20,7 +20,16 @@ const app = getApps().length === 0 ? initializeApp(config) : getApp();
 
 // تصدير الخدمات
 export const auth = getAuth(app);
-export const db = getFirestore(app);
+
+// استخدام initializeFirestore بدلاً من getFirestore لفرض إعدادات الاتصال
+// experimentalForceLongPolling يحل مشكلة [code=unavailable] في الشبكات التي تحظر WebSockets
+export const db = initializeFirestore(app, {
+  experimentalForceLongPolling: true,
+  localCache: persistentLocalCache({
+    tabManager: persistentMultipleTabManager()
+  })
+});
+
 export const analytics = typeof window !== 'undefined' ? getAnalytics(app) : null;
 
 // علامة تشير أن النظام مهيأ
